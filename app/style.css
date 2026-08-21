@@ -1,0 +1,259 @@
+/* ========================================
+   General
+   ======================================== */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #f3f4f6;
+    color: #111827;
+    font: 16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+
+/* ========================================
+   Main application
+   ======================================== */
+
+.app {
+    max-width: 850px;
+    margin: auto;
+    padding: 20px 14px 40px;
+}
+
+
+/* ========================================
+   Header
+   ======================================== */
+
+header {
+    margin-bottom: 18px;
+}
+
+h1 {
+    font-size: clamp(1.7rem, 5vw, 2.3rem);
+    margin: 0 0 6px;
+}
+
+h2 {
+    font-size: 1.15rem;
+    margin: 0 0 14px;
+}
+
+p {
+    margin: 0;
+    color: #4b5563;
+}
+
+
+/* ========================================
+   Cards
+   ======================================== */
+
+.card {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 14px;
+    padding: 18px;
+    margin: 12px 0;
+    box-shadow: 0 2px 8px #00000008;
+}
+
+
+/* ========================================
+   Form layout
+   ======================================== */
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+label {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 5px;
+    align-items: end;
+    font-weight: 600;
+    color: #374151;
+}
+
+label input {
+    grid-column: 1 / -1;
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid #9ca3af;
+    border-radius: 9px;
+    font: inherit;
+    background: #fff;
+}
+
+label span {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.hint {
+    font-size: 0.9rem;
+    margin-top: 12px;
+}
+
+
+/* ========================================
+   Buttons
+   ======================================== */
+
+.primary {
+    width: 100%;
+    border: 0;
+    border-radius: 11px;
+    padding: 14px 18px;
+    font: 700 1rem inherit;
+    background: #111827;
+    color: white;
+    cursor: pointer;
+    margin: 4px 0 8px;
+}
+
+.primary:hover {
+    background: #1f2937;
+}
+
+
+/* ========================================
+   Results
+   ======================================== */
+
+.result {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+    padding: 13px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.result:last-child {
+    border-bottom: 0;
+}
+
+.metric {
+    font-weight: 650;
+}
+
+.value {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.status {
+    grid-column: 1 / -1;
+    font-size: 0.9rem;
+    margin-top: 2px;
+}
+
+.ok {
+    color: #166534;
+}
+
+.bad {
+    color: #b91c1c;
+}
+
+
+/* ========================================
+   Overall result
+   ======================================== */
+
+.overall {
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 10px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.overall.okbg {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.overall.badbg {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+
+/* ========================================
+   Utility / footer
+   ======================================== */
+
+.hidden {
+    display: none;
+}
+
+details {
+    color: #374151;
+}
+
+summary {
+    cursor: pointer;
+    font-weight: 700;
+}
+
+li {
+    margin: 6px 0;
+}
+
+
+/* ========================================
+   Override toggles
+   ======================================== */
+.input-with-button { display: flex; gap: 6px; }
+
+.input-with-button input { flex: 1; min-width: 0; }
+
+.input-with-button input[readonly] { background: #f3f4f6; color: #6b7280; cursor: not-allowed; }
+
+.icon-btn { 
+  padding: 0 12px; 
+  border: 1px solid #9ca3af; 
+  border-radius: 9px; 
+  background: #fff; 
+  cursor: pointer; 
+  font-size: 1rem;
+}
+.icon-btn:hover { background: #e5e7eb; }
+
+
+/* ========================================
+   Mobile layout
+   ======================================== */
+
+@media (max-width: 500px) {
+    .app {
+        padding: 14px 10px 30px;
+    }
+
+    .card {
+        padding: 15px;
+        border-radius: 12px;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .result {
+        grid-template-columns: 1fr;
+    }
+
+    .value {
+        text-align: left;
+    }
+}
+
