@@ -213,7 +213,12 @@ li {
 /* ========================================
    Override toggles
    ======================================== */
-.input-with-button { display: flex; gap: 6px; }
+.input-with-button { 
+  display: flex; 
+  gap: 6px; 
+  grid-column: 1 / -1; 
+  width: 100%; 
+}
 
 .input-with-button input { flex: 1; min-width: 0; }
 
