@@ -46,12 +46,15 @@
 
   <section class="card">
     <h2>Motor</h2>
-    <div class="grid">
+    <div class="grid" style="margin-bottom: 14px;">
       <label>Motor KV <input id="kv" type="number" min="0" step="1" value="660"></label>
+      <label>Voltage sag <span>%</span><input id="voltageSag" type="number" min="0" max="100" step="1" value="5"></label>
+    </div>
+    <div class="grid">
       <label>Peak power (per motor) <span>W</span><input id="power" type="number" min="0" step="1" value="1700"></label>
       <label>Peak current (per motor) <span>A</span><input id="motorAmpsInput" type="number" min="0" step="0.1" value="49.5"></label>
     </div>
-    <p class="hint">Power and current are linked. Editing one automatically updates the other based on battery voltage.</p>
+    <p class="hint">Power and current convert between each other using the battery voltage adjusted by the voltage sag.</p>
   </section>
 
   <section class="card">
@@ -87,8 +90,8 @@
         <li>Estimated total static thrust = total peak power (W) × size-dependent full-throttle efficiency factor (gf/W)</li>
         <li>Thrust-to-weight ratio (TWR) = estimated total static thrust ÷ actual drone weight</li>
         <li>Max safe weight (AUW) = estimated total static thrust ÷ minimum target TWR (2.0 for ≥10" props, 3.0 for smaller props)</li>
-        <li>Estimated loaded RPM ≈ voltage × KV × 0.80</li>
-        <li>Peak current per motor = peak power per motor ÷ battery voltage</li>
+        <li>Estimated loaded RPM ≈ sagged voltage × KV × 0.85</li>
+        <li>Peak current per motor = peak power per motor ÷ sagged voltage</li>
         <li>Total system peak current = peak current per motor × number of motors</li>
         <li>Minimum C-rating = total system peak current ÷ battery capacity (Ah)</li>
         <li>ESC checks: Burst rating covers peak amps; continuous rating covers ≥ 80% of peak amps</li>

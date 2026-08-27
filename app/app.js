@@ -40,20 +40,27 @@ function updateRpmLimitUI() {
   }
 }
 
-// Sync Power (W) and Current (A) inputs based on Voltage
-function syncPowerToAmps() {
+// Calculate the actual voltage under load
+function getSaggedVoltage() {
   const v = Number($("voltage").value);
+  const sag = Number($("voltageSag").value) / 100;
+  return v > 0 ? v * (1 - sag) : 0;
+}
+
+// Sync Power (W) and Current (A) using the sagged voltage
+function syncPowerToAmps() {
   const p = Number($("power").value);
-  if (v > 0 && p > 0) {
-    $("motorAmpsInput").value = (p / v).toFixed(1);
+  const saggedV = getSaggedVoltage();
+  if (saggedV > 0 && p > 0) {
+    $("motorAmpsInput").value = (p / saggedV).toFixed(1);
   }
 }
 
 function syncAmpsToPower() {
-  const v = Number($("voltage").value);
   const a = Number($("motorAmpsInput").value);
-  if (v > 0 && a > 0) {
-    $("power").value = Math.round(a * v);
+  const saggedV = getSaggedVoltage();
+  if (saggedV > 0 && a > 0) {
+    $("power").value = Math.round(a * saggedV);
   }
 }
 
@@ -62,6 +69,7 @@ $("propDiameter").addEventListener("input", updateRpmLimitUI);
 $("power").addEventListener("input", syncPowerToAmps);
 $("motorAmpsInput").addEventListener("input", syncAmpsToPower);
 $("voltage").addEventListener("input", syncPowerToAmps);
+$("voltageSag").addEventListener("input", syncPowerToAmps);
 
 // Handle the override toggle button
 $("toggleOverride").addEventListener("click", () => {
@@ -90,19 +98,21 @@ function check(){
   const kv=n("kv"), power=n("power"), motorAmps=n("motorAmpsInput"), voltage=n("voltage"), capacity=n("capacity"), crate=n("crate");
   const esc=n("esc"), escBurst=n("escBurst");
   const propIn=n("propDiameter"), weight=n("weight"), motors=n("motors"), rpmLimit=n("rpmLimit");
-
-  const values=[weight,motors,propIn,rpmLimit,kv,power,motorAmps,voltage,capacity,crate,esc,escBurst];
+  const sag = n("voltageSag");
+  
+  const values=[weight,motors,propIn,rpmLimit,kv,power,motorAmps,voltage,capacity,crate,esc,escBurst, sag];
   if(values.some(v=>!Number.isFinite(v)||v<=0)){ alert("Please enter positive values in all fields."); return; }
   
   if(escBurst < esc) { 
     alert("The ESC's peak burst rating must be greater than or equal to its continuous rating."); 
     return; 
   }
-
+   
   // Derived calculations & realistic performance metrics
+  const saggedVoltage = voltage * (1 - sag / 100);
   const totalPower = power * motors;
   const totalAmps = motorAmps * motors;
-  const loadedRpm = voltage * kv * 0.80;
+  const loadedRpm = saggedVoltage * kv * 0.85;
   const efficiencyFactor = getEfficiencyFactor(propIn);
   const estimatedTotalThrust = totalPower * efficiencyFactor;
   const twr = estimatedTotalThrust / weight;
@@ -124,8 +134,8 @@ function check(){
   const checks=[
     ["Thrust-to-Weight Ratio", `${fmt(twr,1)} : 1`, `Target ≥ ${minTargetTwr.toFixed(1)} : 1 — ${performanceDesc}`, isWeightOk],
     ["Max Safe Weight (AUW)", `${fmt(maxRecommendedWeight, 0)} g`, `Ceiling for TWR ≥ ${minTargetTwr.toFixed(1)} : 1 (Your build: ${fmt(weight, 0)} g)`, isWeightOk],
-    ["Estimated loaded RPM", `${fmt(loadedRpm,0)} RPM`, `Limit ≤ ${fmt(rpmLimit,0)} RPM`, loadedRpm <= rpmLimit],
-    ["Peak current per motor", `${fmt(motorAmps,1)} A`, `${fmt(power,0)} W ÷ ${fmt(voltage,1)} V`, true],
+    ["Estimated loaded RPM", `${fmt(loadedRpm,0)} RPM`, `Limit ≤ ${fmt(rpmLimit,0)} RPM (${fmt(saggedVoltage,1)}V × ${kv}KV × 0.85)`, loadedRpm <= rpmLimit],
+    ["Peak current per motor", `${fmt(motorAmps,1)} A`, `${fmt(power,0)} W ÷ ${fmt(saggedVoltage,1)} V (sagged)`, true],
     ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(motorAmps,1)} A × ${motors}`, true],
     ["ESC burst capability", `${fmt(escBurst,0)} A`, `Must cover peak ${fmt(motorAmps,1)} A`, escBurst >= motorAmps],
     ["ESC continuous capability", `${fmt(esc,0)} A`, `Target ≥ 80% peak (${fmt(motorAmps * 0.8, 1)} A)`, esc >= (motorAmps * 0.8)],
