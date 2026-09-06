@@ -47,29 +47,43 @@ function getSaggedVoltage() {
   return v > 0 ? v * (1 - sag) : 0;
 }
 
-// Sync Power (W) and Current (A) using the sagged voltage
-function syncPowerToAmps() {
-  const p = Number($("power").value);
-  const saggedV = getSaggedVoltage();
-  if (saggedV > 0 && p > 0) {
-    $("motorAmpsInput").value = (p / saggedV).toFixed(1);
-  }
-}
+// --- Row Management for Test Data ---
+$("addRowBtn").addEventListener("click", () => {
+  const row = document.createElement("div");
+  row.className = "test-row";
+  
+  // Use a fixed 40px width for the final column to perfectly match the header
+  row.style.display = "grid";
+  row.style.gridTemplateColumns = "repeat(4, 1fr) 40px";
+  row.style.gap = "10px";
+  row.style.marginBottom = "10px";
+  row.style.alignItems = "center";
+  
+  row.innerHTML = `
+    <input type="number" class="row-throttle" min="0" max="99" step="1" style="text-align: center;">
+    <input type="number" class="row-thrust" min="0" step="1" style="text-align: center;">
+    <input type="number" class="row-current" min="0" step="0.1" style="text-align: center;">
+    <input type="number" class="row-voltage" min="0" step="0.1" style="text-align: center;">
+    <button type="button" class="icon-btn remove-row" title="Remove row">🗑️</button>
+  `;
+  
+  row.querySelector(".remove-row").addEventListener("click", () => row.remove());
+  $("testDataRows").appendChild(row);
+});
 
-function syncAmpsToPower() {
-  const a = Number($("motorAmpsInput").value);
-  const saggedV = getSaggedVoltage();
-  if (saggedV > 0 && a > 0) {
-    $("power").value = Math.round(a * saggedV);
-  }
-}
+$("sortBtn").addEventListener("click", () => {
+  const container = $("testDataRows");
+  const rows = Array.from(container.querySelectorAll(".test-row"));
+  rows.sort((a, b) => {
+    const valA = Number(a.querySelector(".row-throttle").value) || 0;
+    const valB = Number(b.querySelector(".row-throttle").value) || 0;
+    return valB - valA; // Descending order
+  });
+  rows.forEach(row => container.appendChild(row));
+});
 
 // Event Listeners
 $("propDiameter").addEventListener("input", updateRpmLimitUI);
-$("power").addEventListener("input", syncPowerToAmps);
-$("motorAmpsInput").addEventListener("input", syncAmpsToPower);
-$("voltage").addEventListener("input", syncPowerToAmps);
-$("voltageSag").addEventListener("input", syncPowerToAmps);
 
 // Handle the override toggle button
 $("toggleOverride").addEventListener("click", () => {
@@ -90,25 +104,198 @@ $("toggleOverride").addEventListener("click", () => {
   }
 });
 
-// Initialize UI fields on page load
 updateRpmLimitUI();
-syncPowerToAmps();
+
+// Function to linearly interpolate/extrapolate current based on target thrust
+function getInterpolatedCurrent(targetThrust, dataPoints) {
+  if (targetThrust <= 0) return 0;
+  if (dataPoints.length < 2) return 0;
+
+  for (let i = 0; i < dataPoints.length - 1; i++) {
+    const p1 = dataPoints[i];
+    const p2 = dataPoints[i + 1];
+    if (targetThrust >= p1.thrust && targetThrust <= p2.thrust) {
+      const fraction = (targetThrust - p1.thrust) / (p2.thrust - p1.thrust);
+      return p1.current + fraction * (p2.current - p1.current);
+    }
+  }
+  
+  // Extrapolate if the target thrust exceeds the highest tested value
+  const p1 = dataPoints[dataPoints.length - 2];
+  const p2 = dataPoints[dataPoints.length - 1];
+  const fraction = (targetThrust - p1.thrust) / (p2.thrust - p1.thrust);
+  return p1.current + fraction * (p2.current - p1.current);
+}
+
+// --- Save and Load Setup ---
+$("exportBtn").addEventListener("click", () => {
+  const config = {
+    drone: {
+      weight: n("weight"),
+      motors: n("motors")
+    },
+    propeller: {
+      propDiameter: n("propDiameter"),
+      propPitch: n("propPitch"),
+      rpmLimit: n("rpmLimit")
+    },
+    motor: {
+      kv: n("kv"),
+      voltageSag: n("voltageSag")
+    },
+    battery: {
+      voltage: n("voltage"),
+      capacity: n("capacity"),
+      crate: n("crate")
+    },
+    esc: {
+      esc: n("esc"),
+      escBurst: n("escBurst")
+    },
+    testRows: []
+  };
+
+  document.querySelectorAll('.test-row').forEach(row => {
+    config.testRows.push({
+      mandatory: row.dataset.mandatory === "true",
+      throttle: Number(row.querySelector('.row-throttle').value) || 0,
+      thrust: Number(row.querySelector('.row-thrust').value) || 0,
+      current: Number(row.querySelector('.row-current').value) || 0,
+      voltage: Number(row.querySelector('.row-voltage').value) || 0
+    });
+  });
+
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "drone-setup.json";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+$("importBtn").addEventListener("click", () => $("importFile").click());
+
+$("importFile").addEventListener("change", (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const config = JSON.parse(e.target.result);
+
+      // Populate standard fields
+      if (config.drone) {
+        $("weight").value = config.drone.weight ?? "";
+        $("motors").value = config.drone.motors ?? "";
+      }
+      if (config.propeller) {
+        $("propDiameter").value = config.propeller.propDiameter ?? "";
+        $("propPitch").value = config.propeller.propPitch ?? "";
+        $("rpmLimit").value = config.propeller.rpmLimit ?? "";
+        updateRpmLimitUI();
+      }
+      if (config.motor) {
+        $("kv").value = config.motor.kv ?? "";
+        $("voltageSag").value = config.motor.voltageSag ?? "";
+      }
+      if (config.battery) {
+        $("voltage").value = config.battery.voltage ?? "";
+        $("capacity").value = config.battery.capacity ?? "";
+        $("crate").value = config.battery.crate ?? "";
+      }
+      if (config.esc) {
+        $("esc").value = config.esc.esc ?? "";
+        $("escBurst").value = config.esc.escBurst ?? "";
+      }
+
+      // Populate test rows
+      if (Array.isArray(config.testRows) && config.testRows.length > 0) {
+        const container = $("testDataRows");
+        container.innerHTML = ""; // Clear existing rows
+
+        config.testRows.forEach(rowData => {
+          const row = document.createElement("div");
+          row.className = "test-row";
+          if (rowData.mandatory) row.dataset.mandatory = "true";
+
+          row.style.display = "grid";
+          row.style.gridTemplateColumns = "repeat(4, 1fr) 40px";
+          row.style.gap = "10px";
+          row.style.marginBottom = "10px";
+          row.style.alignItems = "center";
+
+          if (rowData.mandatory) {
+            row.innerHTML = `
+              <input type="number" class="row-throttle" value="${rowData.throttle}" readonly style="text-align: center;">
+              <input type="number" class="row-thrust" min="0" step="1" value="${rowData.thrust}" style="text-align: center;">
+              <input type="number" class="row-current" min="0" step="0.1" value="${rowData.current}" style="text-align: center;">
+              <input type="number" class="row-voltage" min="0" step="0.1" value="${rowData.voltage}" style="text-align: center;">
+              <button type="button" class="icon-btn" style="visibility: hidden;" aria-hidden="true">🗑️</button>
+            `;
+          } else {
+            row.innerHTML = `
+              <input type="number" class="row-throttle" min="0" max="99" step="1" value="${rowData.throttle}" style="text-align: center;">
+              <input type="number" class="row-thrust" min="0" step="1" value="${rowData.thrust}" style="text-align: center;">
+              <input type="number" class="row-current" min="0" step="0.1" value="${rowData.current}" style="text-align: center;">
+              <input type="number" class="row-voltage" min="0" step="0.1" value="${rowData.voltage}" style="text-align: center;">
+              <button type="button" class="icon-btn remove-row" title="Remove row">🗑️</button>
+            `;
+            row.querySelector(".remove-row").addEventListener("click", () => row.remove());
+          }
+          container.appendChild(row);
+        });
+      }
+
+      alert("Setup loaded successfully!");
+    } catch (err) {
+      alert("Failed to parse the configuration file. Please ensure it is a valid JSON file.");
+      console.error(err);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = ""; // Reset file input
+});
+
 
 function check(){
-  const kv=n("kv"), power=n("power"), motorAmps=n("motorAmpsInput"), voltage=n("voltage"), capacity=n("capacity"), crate=n("crate");
+  const kv=n("kv"), voltage=n("voltage"), capacity=n("capacity"), crate=n("crate");
   const esc=n("esc"), escBurst=n("escBurst");
-  const propIn=n("propDiameter"), weight=n("weight"), motors=n("motors"), rpmLimit=n("rpmLimit");
+  const propIn=n("propDiameter"), propPitch=n("propPitch"), weight=n("weight"), motors=n("motors"), rpmLimit=n("rpmLimit");
   const sag = n("voltageSag");
   
-  const values=[weight,motors,propIn,rpmLimit,kv,power,motorAmps,voltage,capacity,crate,esc,escBurst, sag];
-  if(values.some(v=>!Number.isFinite(v)||v<=0)){ alert("Please enter positive values in all fields."); return; }
+  // Safely find the peak row (fallback to the first test row if mandatory attribute is missing)
+  const peakRow = document.querySelector('.test-row[data-mandatory="true"]') || document.querySelector('.test-row');
+  if (!peakRow) {
+    alert("Please ensure the motor test data table is properly loaded.");
+    return;
+  }
+
+  const motorAmps = Number(peakRow.querySelector('.row-current').value);
+  const testVoltage = Number(peakRow.querySelector('.row-voltage').value);
+  const power = motorAmps * testVoltage;
+
+  // Extract all test data rows for interpolation
+  const testData = [{ thrust: 0, current: 0 }]; // Origin point
+  document.querySelectorAll('.test-row').forEach(row => {
+    const thrust = Number(row.querySelector('.row-thrust').value);
+    const current = Number(row.querySelector('.row-current').value);
+    if (thrust > 0 && current > 0) {
+      testData.push({ thrust, current });
+    }
+  });
+  testData.sort((a, b) => a.thrust - b.thrust);
+  
+  const values=[weight,motors,propIn,propPitch,rpmLimit,kv,power,motorAmps,testVoltage,voltage,capacity,crate,esc,escBurst, sag];
+  if(values.some(v=>!Number.isFinite(v)||v<=0)){ alert("Please enter positive values in all fields, including the test data rows."); return; }
   
   if(escBurst < esc) { 
     alert("The ESC's peak burst rating must be greater than or equal to its continuous rating."); 
     return; 
   }
    
-  // Derived calculations & realistic performance metrics
+  // Derived calculations
   const saggedVoltage = voltage * (1 - sag / 100);
   const totalPower = power * motors;
   const totalAmps = motorAmps * motors;
@@ -117,12 +304,16 @@ function check(){
   const estimatedTotalThrust = totalPower * efficiencyFactor;
   const twr = estimatedTotalThrust / weight;
   
-  // Dynamic minimum target TWR (2.0 for large macro-quads, 3.0 for smaller quads)
   const minTargetTwr = propIn >= 10 ? 2.0 : 3.0;
   const maxRecommendedWeight = estimatedTotalThrust / minTargetTwr;
   const isWeightOk = twr >= minTargetTwr;
 
-  // Performance category description
+  // Calculate required continuous current based on target TWR
+  const requiredThrustPerMotor = (weight * minTargetTwr) / motors;
+  const requiredContinuousAmps = getInterpolatedCurrent(requiredThrustPerMotor, testData);
+  const continuousRatio = requiredContinuousAmps / esc;
+  const isContinuousOk = continuousRatio <= 1.0;
+
   let performanceDesc = "Optimal";
   if (!isWeightOk) performanceDesc = "Underpowered (Too Heavy)";
   else if (twr > 6.0) performanceDesc = "Very agile";
@@ -130,15 +321,18 @@ function check(){
   else performanceDesc = "Reasonable";
 
   const minC = totalAmps / capacity;
-
+  
+  const burstOverload = motorAmps / escBurst;
+  const excessHeatRate = burstOverload > 1 ? (Math.pow(burstOverload, 2) - 1) * 100 : 0;
+  
   const checks=[
     ["Thrust-to-Weight Ratio", `${fmt(twr,1)} : 1`, `Target ≥ ${minTargetTwr.toFixed(1)} : 1 — ${performanceDesc}`, isWeightOk],
     ["Max Safe Weight (AUW)", `${fmt(maxRecommendedWeight, 0)} g`, `Ceiling for TWR ≥ ${minTargetTwr.toFixed(1)} : 1 (Your build: ${fmt(weight, 0)} g)`, isWeightOk],
     ["Estimated loaded RPM", `${fmt(loadedRpm,0)} RPM`, `Limit ≤ ${fmt(rpmLimit,0)} RPM (${fmt(saggedVoltage,1)}V × ${kv}KV × 0.85)`, loadedRpm <= rpmLimit],
-    ["Peak current per motor", `${fmt(motorAmps,1)} A`, `${fmt(power,0)} W ÷ ${fmt(saggedVoltage,1)} V (sagged)`, true],
+    ["Peak current per motor", `${fmt(motorAmps,1)} A`, `${fmt(power,0)} W test peak`, true],
     ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(motorAmps,1)} A × ${motors}`, true],
-    ["ESC burst capability", `${fmt(escBurst,0)} A`, `Must cover peak ${fmt(motorAmps,1)} A`, escBurst >= motorAmps],
-    ["ESC continuous capability", `${fmt(esc,0)} A`, `Target ≥ 80% peak (${fmt(motorAmps * 0.8, 1)} A)`, esc >= (motorAmps * 0.8)],
+    ["ESC burst capability", `${fmt(escBurst,0)} A`, `Peak ${fmt(motorAmps,1)} A causes ${fmt(excessHeatRate,1)}% excess heat (limit ≤ 10%)`, excessHeatRate <= 10],
+    ["ESC continuous capability", `${fmt(esc,0)} A`, `Requires ${fmt(requiredContinuousAmps, 1)} A for TWR ${minTargetTwr.toFixed(1)} : 1 (${fmt(requiredThrustPerMotor, 0)} gf/motor)`, isContinuousOk],
     ["Battery minimum C-rating", `${fmt(minC,1)} C`, "Total amps ÷ capacity", crate >= minC]
   ];
 
@@ -154,6 +348,4 @@ function check(){
   $("overall").className=`overall ${allOk?"okbg":"badbg"}`;
   $("results").classList.remove("hidden");
   $("results").scrollIntoView({behavior:"smooth",block:"start"});
-}
-
-$("check").addEventListener("click", check);
+}$("check").addEventListener("click", check);

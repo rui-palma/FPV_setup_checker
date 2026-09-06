@@ -27,8 +27,11 @@
 
   <section class="card">
     <h2>Propeller</h2>
-    <div class="grid">
+    <div class="grid" style="margin-bottom: 14px;">
       <label>Diameter <span>in</span><input id="propDiameter" type="number" min="0" step="0.1" value="13"></label>
+      <label>Pitch <span>in</span><input id="propPitch" type="number" min="0" step="0.1" value="4.5"></label>
+    </div>
+    <div class="grid">
       <label>Max safe RPM <span>RPM</span>
         <div class="input-with-button">
           <input id="rpmLimit" type="number" min="1" step="100" readonly>
@@ -46,15 +49,37 @@
 
   <section class="card">
     <h2>Motor</h2>
-    <div class="grid" style="margin-bottom: 14px;">
+    <div class="grid">
       <label>Motor KV <input id="kv" type="number" min="0" step="1" value="660"></label>
       <label>Voltage sag <span>%</span><input id="voltageSag" type="number" min="0" max="100" step="1" value="5"></label>
     </div>
-    <div class="grid">
-      <label>Peak power (per motor) <span>W</span><input id="power" type="number" min="0" step="1" value="1700"></label>
-      <label>Peak current (per motor) <span>A</span><input id="motorAmpsInput" type="number" min="0" step="0.1" value="49.5"></label>
+  </section>
+
+ <section class="card">
+    <h2>Motor Manufacturer Test Data</h2>
+    <!-- Table Header Row -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr) 40px; gap: 10px; margin-bottom: 8px; text-align: center; font-size: 0.9em; font-weight: bold; color: var(--text-muted, #9ca3af);">
+      <div>Throttle (%)</div>
+      <div>Thrust (gf)</div>
+      <div>Current (A)</div>
+      <div>Voltage (V)</div>
+      <div></div> <!-- Clean empty spacer -->
     </div>
-    <p class="hint">Power and current convert between each other using the battery voltage adjusted by the voltage sag.</p>
+    <div id="testDataRows">
+      <!-- Mandatory 100% throttle row -->
+      <div class="test-row" data-mandatory="true" style="display: grid; grid-template-columns: repeat(4, 1fr) 40px; gap: 10px; margin-bottom: 10px; align-items: center;">
+        <input type="number" class="row-throttle" value="100" readonly style="text-align: center;">
+        <input type="number" class="row-thrust" min="0" step="1" value="2500" style="text-align: center;">
+        <input type="number" class="row-current" min="0" step="0.1" value="49.5" style="text-align: center;">
+        <input type="number" class="row-voltage" min="0" step="0.1" value="24.0" style="text-align: center;">
+        <button type="button" class="icon-btn" style="visibility: hidden;" aria-hidden="true">🗑️</button>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px; margin-top: 14px;">
+      <button id="addRowBtn" type="button" class="secondary">➕ Add Row</button>
+      <button id="sortBtn" type="button" class="secondary">↕️ Sort by Throttle</button>
+    </div>
+    <p class="hint">The 100% throttle row provides the peak power and current values for your setup.</p>
   </section>
 
   <section class="card">
@@ -75,6 +100,12 @@
     <p class="hint">Burst rating handles temporary throttle spikes. Continuous handles sustained forward flight.</p>
   </section>
 
+  <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+    <button id="exportBtn" type="button" class="secondary">💾 Save Setup</button>
+    <button id="importBtn" type="button" class="secondary">📂 Load Setup</button>
+    <input type="file" id="importFile" accept=".json" style="display: none;">
+  </div>
+
   <button id="check" class="primary">Check setup</button>
 
   <section id="results" class="card results hidden">
@@ -94,7 +125,8 @@
         <li>Peak current per motor = peak power per motor ÷ sagged voltage</li>
         <li>Total system peak current = peak current per motor × number of motors</li>
         <li>Minimum C-rating = total system peak current ÷ battery capacity (Ah)</li>
-        <li>ESC checks: Burst rating covers peak amps; continuous rating covers ≥ 80% of peak amps</li>
+        <li>ESC checks: Burst rating evaluates the transient zero-airspeed spike, allowing up to a 10% excess resistive heat rate ((Peak Amps ÷ ESC Burst)&#178; - 1);</li>
+        <li>Continuous rating evaluates the exact interpolated continuous current ($I_{\rm required,motor}$) required to hover and maneuver at the target TWR ($R$) using formula $T_{\rm required,motor} = \frac{RW}{N}$.</li>
       </ul>
     </details>
   </footer>
