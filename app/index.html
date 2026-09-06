@@ -104,6 +104,13 @@
       <label>Min supported cells <span>S</span><input id="escMinS" type="number" min="1" step="1" value="3"></label>
       <label>Max supported cells <span>S</span><input id="escMaxS" type="number" min="1" step="1" value="6"></label>
     </div>
+    <div class="grid" style="margin-top: 14px;">
+      <label>Max safe utilization limit <span>%</span>
+        <div class="input-with-button">
+          <input id="escUtilizationLimit" type="number" value="80" readonly>
+        </div>
+      </label>
+    </div>
     <p class="hint">Burst rating handles temporary throttle spikes. Continuous handles sustained forward flight.</p>
   </section>
 

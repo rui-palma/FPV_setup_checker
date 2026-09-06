@@ -153,7 +153,8 @@ $("exportBtn").addEventListener("click", () => {
       esc: n("esc"),
       escBurst: n("escBurst"),
       escMinS: n("escMinS"),
-      escMaxS: n("escMaxS")
+      escMaxS: n("escMaxS"),
+      escUtilizationLimit: n("escUtilizationLimit")
     },
     testRows: []
   };
@@ -213,6 +214,7 @@ $("importFile").addEventListener("change", (event) => {
         $("escBurst").value = config.esc.escBurst ?? "";
         $("escMinS").value = config.esc.escMinS ?? "";
         $("escMaxS").value = config.esc.escMaxS ?? "";
+        $("escUtilizationLimit").value = config.esc.escUtilizationLimit ?? "80";
       }
 
       if (Array.isArray(config.testRows) && config.testRows.length > 0) {
@@ -266,6 +268,7 @@ $("importFile").addEventListener("change", (event) => {
 function check(){
   const kv=n("kv"), capacity=n("capacity"), crate=n("crate");
   const esc=n("esc"), escBurst=n("escBurst"), escMinS=n("escMinS"), escMaxS=n("escMaxS");
+  const escUtilizationLimit = n("escUtilizationLimit") / 100;
   const propIn=n("propDiameter"), weight=n("weight"), motors=n("motors"), rpmLimit=n("rpmLimit");
   const sag = n("voltageSag");
   const batteryS = n("batteryS"), motorMinS = n("motorMinS"), motorMaxS = n("motorMaxS");
@@ -293,16 +296,13 @@ function check(){
   const isVoltageForMotorsOk = batteryS >= motorMinS && batteryS <= motorMaxS;
   const isEscVoltageOk = batteryS >= escMinS && batteryS <= escMaxS;
   
-  // Calculate Target Voltages (using 3.7V nominal per cell)
   const nominalBatteryVoltage = batteryS * 3.7;
   const saggedVoltage = nominalBatteryVoltage * (1 - sag / 100);
 
-  // Scale Peak Values based on V^2 relation
   const peakVRatio = saggedVoltage / rawTestVoltage;
   const scaledMotorAmps = rawMotorAmps * Math.pow(peakVRatio, 2);
   const scaledPower = scaledMotorAmps * saggedVoltage;
 
-  // Extract and Scale all test data rows for interpolation
   const testData = [{ thrust: 0, current: 0 }]; 
   document.querySelectorAll('.test-row').forEach(row => {
     const rawThrust = Number(row.querySelector('.row-thrust').value);
@@ -319,7 +319,6 @@ function check(){
   });
   testData.sort((a, b) => a.thrust - b.thrust);
    
-  // Derived calculations
   const totalPower = scaledPower * motors;
   const totalAmps = scaledMotorAmps * motors;
   const loadedRpm = saggedVoltage * kv * 0.85;
@@ -331,11 +330,14 @@ function check(){
   const maxRecommendedWeight = estimatedTotalThrust / minTargetTwr;
   const isWeightOk = twr >= minTargetTwr;
 
-  // Continuous current interpolation using scaled data
+  // Capped continuous current calculation
   const requiredThrustPerMotor = (weight * minTargetTwr) / motors;
-  const requiredContinuousAmps = getInterpolatedCurrent(requiredThrustPerMotor, testData);
-  const continuousRatio = requiredContinuousAmps / esc;
-  const isContinuousOk = continuousRatio <= 1.0;
+  const rawRequiredAmps = getInterpolatedCurrent(requiredThrustPerMotor, testData);
+  const requiredContinuousAmps = Math.min(rawRequiredAmps, scaledMotorAmps);
+  
+  const maxSafeContinuousAmps = esc * escUtilizationLimit;
+  const isContinuousOk = requiredContinuousAmps <= maxSafeContinuousAmps;
+  const escUtilizationPct = (requiredContinuousAmps / esc) * 100;
 
   let performanceDesc = "Optimal";
   if (!isWeightOk) performanceDesc = "Underpowered (Too Heavy)";
@@ -344,7 +346,6 @@ function check(){
   else performanceDesc = "Reasonable";
 
   const minC = totalAmps / capacity;
-  
   const burstOverload = scaledMotorAmps / escBurst;
   const excessHeatRate = burstOverload > 1 ? (Math.pow(burstOverload, 2) - 1) * 100 : 0;
   
@@ -358,6 +359,7 @@ function check(){
     ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(scaledMotorAmps,1)} A × ${motors}`, true],
     ["ESC burst capability", `${fmt(escBurst,0)} A`, `Peak ${fmt(scaledMotorAmps,1)} A causes ${fmt(excessHeatRate,1)}% excess heat (limit ≤ 10%)`, excessHeatRate <= 10],
     ["ESC continuous capability", `${fmt(esc,0)} A`, `Requires ${fmt(requiredContinuousAmps, 1)} A for TWR ${minTargetTwr.toFixed(1)} : 1 (${fmt(requiredThrustPerMotor, 0)} gf/motor)`, isContinuousOk],
+    ["ESC continuous utilization", `${fmt(escUtilizationPct, 1)}%`, `Current usage is at ${fmt(escUtilizationPct, 1)}% of continuous rating (limit ≤ ${Math.round(escUtilizationLimit * 100)}%)`, isContinuousOk],
     ["Battery minimum C-rating", `${fmt(minC,1)} C`, "Total amps ÷ capacity", crate >= minC]
   ];
 
