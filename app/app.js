@@ -216,11 +216,12 @@ function check(){
     return;
   }
 
-  const rawMotorAmps = Number(peakRow.querySelector('.row-current').value);
-  const rawTestVoltage = Number(peakRow.querySelector('.row-voltage').value);
-  const rawPeakThrust = Number(peakRow.querySelector('.row-thrust').value);
+  const peakAmpsPerMotorFromTest = Number(peakRow.querySelector('.row-current').value);
+  const peakVoltagePerMotorFromTest = Number(peakRow.querySelector('.row-voltage').value);
+  const peakThrustPerMotorFromTest = Number(peakRow.querySelector('.row-thrust').value);
+  const peakLoadedRPMFromTest = Number(peakRow.querySelector('.row-rpm').value);
   
-  const values=[weight, motors, propIn, kv, batteryS, capacity, crate, esc, escBurst, escMinS, escMaxS, motorMinS, motorMaxS, testBatteryS, rawMotorAmps, rawTestVoltage, rawPeakThrust];
+  const values=[weight, motors, propIn, kv, batteryS, capacity, crate, esc, escBurst, escMinS, escMaxS, motorMinS, motorMaxS, testBatteryS, peakAmpsPerMotorFromTest, peakVoltagePerMotorFromTest, peakThrustPerMotorFromTest];
   if(values.some(v=>!Number.isFinite(v)||v<=0)){ 
     alert("Please enter positive values in all fields, including the test data rows."); 
     return; 
@@ -234,11 +235,15 @@ function check(){
   const isVoltageForMotorsOk = batteryS >= motorMinS && batteryS <= motorMaxS;
   const isEscVoltageOk = batteryS >= escMinS && batteryS <= escMaxS;
   const voltageRatio = batteryS / testBatteryS;
-  const scaledMotorAmps = rawMotorAmps * Math.pow(voltageRatio, 2);
-  const scaledPeakThrust = rawPeakThrust * Math.pow(voltageRatio, 2);
-  const estimatedTotalThrust = scaledPeakThrust * motors;
-  const estimatedUserVoltage = rawTestVoltage * voltageRatio;
-  const scaledPower = rawMotorAmps * rawTestVoltage;
+  const peakAmpsPerMotor = peakAmpsPerMotorFromTest * Math.pow(voltageRatio, 2);
+  const peakThrustPerMotor = peakThrustPerMotorFromTest * Math.pow(voltageRatio, 2);
+  const peakVoltagePerMotor = peakVoltagePerMotorFromTest * voltageRatio;
+  const peakLoadedRPM = peakLoadedRPMFromTest * voltageRatio;
+  const peakPowerPerMotor = peakAmpsPerMotor * peakVoltagePerMotor;
+  
+  // "total" means it accounts for all motors
+  const totalPeakThrust = peakThrustPerMotor * motors;
+  const totalAmps = peakAmpsPerMotor * motors;
 
   const testData = [{ thrust: 0, current: 0, rpm: 0 }]; 
   document.querySelectorAll('.test-row').forEach(row => {
@@ -256,67 +261,85 @@ function check(){
   });
   testData.sort((a, b) => a.thrust - b.thrust);
   
-  const totalAmps = scaledMotorAmps * motors;
+  const twr = totalPeakThrust / weight;
+  const maxRecommendedWeight = totalPeakThrust / minTargetTwr;
+  const requiredThrustPerMotor = weight * minTargetTwr / motors;
   
-  const estimatedLoadedRpm = Math.max(...testData.map(d => d.rpm));
-  
-  const twr = estimatedTotalThrust / weight;
-  const targetThrust = weight * minTargetTwr;
-  const maxRecommendedWeight = estimatedTotalThrust / minTargetTwr;
-  
-  const propulsionUtilization = estimatedTotalThrust > 0 ? targetThrust / estimatedTotalThrust : 1.0;
-  const isPropulsionUtilizationOk = propulsionUtilization <= propulsionUtilizationLimit;
-  const isWeightOk = twr >= minTargetTwr && isPropulsionUtilizationOk;
+  const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
+  const redPropulsionLimit = 0.9; // 90% of peak thrust
+  let propulsionStatus = 'ok';
+  if (propulsionUtilization >= redPropulsionLimit) {
+      propulsionStatus = 'bad'
+  }
+  else if (propulsionUtilization > propulsionUtilizationLimit) {
+      propulsionStatus = 'warn'
+  }
+  const isWeightOk = twr * propulsionUtilization >= minTargetTwr && propulsionStatus !== 'bad';
 
-  const requiredThrustPerMotor = targetThrust / motors;
+  
   const rawRequiredAmps = getInterpolatedValue(requiredThrustPerMotor, testData, 'current');
-  const requiredContinuousAmps = Math.min(rawRequiredAmps, scaledMotorAmps);
+  const requiredContinuousAmps = Math.min(rawRequiredAmps, peakAmpsPerMotor);
   
   const targetRpm = getInterpolatedValue(requiredThrustPerMotor, testData, 'rpm');
   // RPM safety margin derived from propulsion utilization (square root relation: RPM proportional to sqrt of thrust)
-  const rpmLimitFactor = Math.sqrt(propulsionUtilizationLimit);
-  const maxAllowedRpmLimit = rpmLimitFactor * estimatedLoadedRpm;
-  const isTargetRpmOk = targetRpm <= maxAllowedRpmLimit;
+  const rpmGreenLimitFactor = Math.sqrt(propulsionUtilizationLimit);
+  const rpmRedLimitFactor = Math.sqrt(redPropulsionLimit);
+  const maxAllowedRpmLimit = rpmRedLimitFactor * peakLoadedRPM;
+  let rpmStatus = 'ok';
+  if (targetRpm >= rpmRedLimitFactor * peakLoadedRPM) {
+      rpmStatus = 'bad'
+  }
+  else if (targetRpm > rpmGreenLimitFactor * peakLoadedRPM) {
+      rpmStatus = 'warn'
+  }
+  const isTargetRpmOk = rpmStatus !== 'bad';
 
   const maxSafeContinuousAmps = esc * escUtilizationLimit;
   const isContinuousOk = requiredContinuousAmps <= maxSafeContinuousAmps;
   const escUtilizationPct = (requiredContinuousAmps / esc) * 100;
 
   let performanceDesc = "Optimal";
-  if (!isWeightOk) performanceDesc = "Underpowered (Too Heavy)";
-  else if (twr > 6.0) performanceDesc = "Very agile";
+  if (twr > 6.0) performanceDesc = "Very agile";
   else if (twr > 4.0) performanceDesc = "Agile";
-  else performanceDesc = "Reasonable";
+  else if (twr > 2 / propulsionUtilizationLimit) performanceDesc = "Reasonable";
+  else if (twr >= 2) performanceDesc = "Heavy, becoming underpowered";
+  else performanceDesc = "Underpowered (Too Heavy)";
 
   const minC = totalAmps / capacity;
-  const burstOverload = scaledMotorAmps / escBurst;
+  const burstOverload = peakAmpsPerMotor / escBurst;
   const excessHeatRate = burstOverload > 1 ? (Math.pow(burstOverload, 2) - 1) * 100 : 0;
   
-  const checks=[
-    ["Battery/Motor Voltage Match", `${batteryS}S`, `Motor accepts ${motorMinS}S to ${motorMaxS}S`, isVoltageForMotorsOk],
-    ["Battery/ESC Voltage Match", `${batteryS}S`, `ESC accepts ${escMinS}S to ${escMaxS}S`, isEscVoltageOk],
-    ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, `Target thrust (${fmt(targetThrust, 0)} gf) vs max available (${fmt(estimatedTotalThrust, 0)} gf) — limit ≤ ${Math.round(propulsionUtilizationLimit * 100)}%`, isPropulsionUtilizationOk],
-    ["Thrust-to-Weight Ratio", `${fmt(twr,1)} : 1`, `Target ≥ ${minTargetTwr.toFixed(1)} : 1 — ${performanceDesc}`, isWeightOk],
-    ["Max Safe Weight (AUW)", `${fmt(maxRecommendedWeight, 0)} g`, `Ceiling for TWR ≥ ${minTargetTwr.toFixed(1)} : 1 (Your build: ${fmt(weight, 0)} g)`, isWeightOk],
-    ["Target Operational RPM", `${fmt(targetRpm,0)} RPM`, `Target RPM ≤ max allowed RPM ${fmt(rpmLimitFactor * estimatedLoadedRpm, 0)} = limit factor (${fmt(rpmLimitFactor * 100, 1)}%) × peak RPM (${fmt(estimatedLoadedRpm, 0)})`, isTargetRpmOk],
-    ["Peak current/motor", `${fmt(scaledMotorAmps,1)} A`, `${fmt(scaledPower,0)} W peak at scaled ${fmt(estimatedUserVoltage,1)}V`, true],
-    ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(scaledMotorAmps,1)} A × ${motors}`, true],
-    ["ESC burst capability", `${fmt(escBurst,0)} A`, `Peak ${fmt(scaledMotorAmps,1)} A causes ${fmt(excessHeatRate,1)}% excess heat (limit ≤ 10%)`, excessHeatRate <= 10],
-    ["ESC continuous capability", `${fmt(esc,0)} A`, `Requires ${fmt(requiredContinuousAmps, 1)} A for TWR ${minTargetTwr.toFixed(1)} : 1 (${fmt(requiredThrustPerMotor, 0)} gf/motor)`, isContinuousOk],
-    ["ESC continuous utilization", `${fmt(escUtilizationPct, 1)}%`, `Current usage is at ${fmt(escUtilizationPct, 1)}% of continuous rating (limit ≤ ${Math.round(escUtilizationLimit * 100)}%)`, isContinuousOk],
-    ["Battery minimum C-rating", `${fmt(minC,1)} C`, "Total amps ÷ capacity", crate >= minC]
+  const getSymbol = (status) => status === 'ok' ? '✅' : status === 'warn' ? '⚠️' : '❌';
+  const getCssClass = (status) => status === 'ok' ? 'ok' : status === 'warn' ? 'warn' : 'bad';
+  
+  const checks = [
+    ["Battery/Motor Voltage Match", `${batteryS}S`, `Motor accepts ${motorMinS}S to ${motorMaxS}S`, isVoltageForMotorsOk ? 'ok' : 'bad'],
+    ["Battery/ESC Voltage Match", `${batteryS}S`, `ESC accepts ${escMinS}S to ${escMaxS}S`, isEscVoltageOk ? 'ok' : 'bad'],
+    ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, `(Yellow > ${Math.round(propulsionUtilizationLimit * 100)}%, Red > ${Math.round(redPropulsionLimit * 100)}%)`, propulsionStatus],
+    ["Thrust-to-Weight Ratio", `${fmt(twr,1)} : 1`, `Target ≥ ${minTargetTwr.toFixed(1)} — ${performanceDesc}`, propulsionStatus],
+    ["Max Safe Weight (AUW)", `${fmt(maxRecommendedWeight, 0)} g`, `Ceiling for TWR ≥ ${minTargetTwr.toFixed(1)} : 1 (Your build: ${fmt(weight, 0)} g)`, propulsionStatus],
+    ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, `(Yellow > ${fmt(rpmGreenLimitFactor * peakLoadedRPM, 0)}) (Red > ${fmt(rpmRedLimitFactor * peakLoadedRPM, 0)})`, rpmStatus],
+    ["Peak current/motor", `${fmt(peakAmpsPerMotor,1)} A`, `${fmt(peakPowerPerMotor,0)} W peak at scaled ${fmt(peakVoltagePerMotor,1)}V`, 'ok'],
+    ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
+    ["ESC burst capability", `${fmt(escBurst,0)} A`, `Peak ${fmt(peakAmpsPerMotor,1)} A causes ${fmt(excessHeatRate,1)}% excess heat (limit ≤ 10%)`, excessHeatRate <= 10 ? 'ok' : 'bad'],
+    ["ESC continuous capability", `${fmt(esc,0)} A`, `Requires ${fmt(requiredContinuousAmps, 1)} A for TWR ${minTargetTwr.toFixed(1)} : 1`, isContinuousOk ? 'ok' : 'bad'],
+    ["ESC continuous utilization", `${fmt(escUtilizationPct, 1)}%`, `Current usage is at ${fmt(escUtilizationPct, 1)}% of continuous rating`, isContinuousOk ? 'ok' : 'bad'],
+    ["Battery minimum C-rating", `${fmt(minC,1)} C`, "Total amps ÷ capacity", crate >= minC ? 'ok' : 'bad']
   ];
 
-  $("resultList").innerHTML=checks.map(([metric,value,detail,ok])=>`
+  $("resultList").innerHTML = checks.map(([metric, value, detail, status]) => `
     <div class="result">
-      <div class="metric">${ok?"✅":"❌"} ${metric}</div>
+      <div class="metric">${getSymbol(status)} ${metric}</div>
       <div class="value">${value}</div>
-      <div class="status ${ok?"ok":"bad"}">${detail} — ${ok?"OK":"NOT OK"}</div>
+      <div class="status ${getCssClass(status)}">${detail} — ${status.toUpperCase()}</div>
     </div>`).join("");
 
-  const allOk=checks.every(c=>c[3]);
-  $("overall").textContent=allOk?"SETUP APPEARS OK":"SETUP NEEDS ATTENTION";
-  $("overall").className=`overall ${allOk?"okbg":"badbg"}`;
+  const allOk = checks.every(c => c[3] === 'ok');
+  const hasWarnings = checks.some(c => c[3] === 'warn');
+  const hasErrors = checks.some(c => c[3] === 'bad');
+  
+  $("overall").textContent = hasErrors ? "SETUP NEEDS ATTENTION" : hasWarnings ? "SETUP HAS WARNINGS" : "SETUP APPEARS OK";
+  $("overall").className = `overall ${hasErrors ? 'badbg' : hasWarnings ? 'warnbg' : 'okbg'}`;
   $("results").classList.remove("hidden");
   $("results").scrollIntoView({behavior:"smooth",block:"start"});
 }
