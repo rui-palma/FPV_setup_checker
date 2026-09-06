@@ -29,7 +29,6 @@
     <h2>Propeller</h2>
     <div class="grid" style="margin-bottom: 14px;">
       <label>Diameter <span>in</span><input id="propDiameter" type="number" min="0" step="0.1" value="13"></label>
-      <label>Pitch <span>in</span><input id="propPitch" type="number" min="0" step="0.1" value="4.5"></label>
     </div>
     <div class="grid">
       <label>Max safe RPM <span>RPM</span>
@@ -52,6 +51,10 @@
     <div class="grid">
       <label>Motor KV <input id="kv" type="number" min="0" step="1" value="660"></label>
       <label>Voltage sag <span>%</span><input id="voltageSag" type="number" min="0" max="100" step="1" value="5"></label>
+    </div>
+    <div class="grid" style="margin-top: 14px;">
+      <label>Min supported battery cells (e.g. 3 for 3S)<span>S</span><input id="motorMinS" type="number" min="1" step="1" value="4"></label>
+      <label>Max supported battery cells (e.g. 6 for 6S)<span>S</span><input id="motorMaxS" type="number" min="1" step="1" value="6"></label>
     </div>
   </section>
 
@@ -85,7 +88,7 @@
   <section class="card">
     <h2>Battery</h2>
     <div class="grid">
-      <label>Nominal voltage <span>V</span><input id="voltage" type="number" min="0" step="0.1" value="22.2"></label>
+      <label>Cell count (e.g., 6 for 6S) <span>S</span><input id="batteryS" type="number" min="1" step="1" value="6"></label>
       <label>Capacity <span>Ah</span><input id="capacity" type="number" min="0" step="0.1" value="5"></label>
       <label>C-rating <span>C</span><input id="crate" type="number" min="0" step="1" value="50"></label>
     </div>
@@ -118,15 +121,15 @@
     <details>
       <summary>Formulas used</summary>
       <ul>
-        <li>Estimated total static thrust = total peak power (W) × size-dependent full-throttle efficiency factor (gf/W)</li>
+        <li>Data scaling: Test data is converted to the user's actual sagged battery voltage using standard aerodynamic approximations: Thrust $\propto V^2$ and Current $\propto V^2$.</li>
+        <li>Estimated total static thrust = scaled total peak power (W) × size-dependent full-throttle efficiency factor (gf/W)</li>
         <li>Thrust-to-weight ratio (TWR) = estimated total static thrust ÷ actual drone weight</li>
         <li>Max safe weight (AUW) = estimated total static thrust ÷ minimum target TWR (2.0 for ≥10" props, 3.0 for smaller props)</li>
-        <li>Estimated loaded RPM ≈ sagged voltage × KV × 0.85</li>
-        <li>Peak current per motor = peak power per motor ÷ sagged voltage</li>
-        <li>Total system peak current = peak current per motor × number of motors</li>
+        <li>Estimated loaded RPM ≈ sagged voltage (S × 3.7V) × KV × 0.85</li>
+        <li>Total system peak current = scaled peak current per motor × number of motors</li>
         <li>Minimum C-rating = total system peak current ÷ battery capacity (Ah)</li>
-        <li>ESC checks: Burst rating evaluates the transient zero-airspeed spike, allowing up to a 10% excess resistive heat rate ((Peak Amps ÷ ESC Burst)&#178; - 1);</li>
-        <li>Continuous rating evaluates the exact interpolated continuous current ($I_{\rm required,motor}$) required to hover and maneuver at the target TWR ($R$) using formula $T_{\rm required,motor} = \frac{RW}{N}$.</li>
+        <li>ESC burst rating evaluates the transient zero-airspeed spike, allowing up to a 10% excess resistive heat rate ((Peak Amps ÷ ESC Burst)&#178; - 1).</li>
+        <li>ESC continuous rating evaluates the exact interpolated continuous current ($I_{\rm required,motor}$) required to hover and maneuver at the target TWR ($R$) using formula $T_{\rm required,motor} = \frac{RW}{N}$.</li>
       </ul>
     </details>
   </footer>
