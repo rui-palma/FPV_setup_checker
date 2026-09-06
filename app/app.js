@@ -151,7 +151,9 @@ $("exportBtn").addEventListener("click", () => {
     },
     esc: {
       esc: n("esc"),
-      escBurst: n("escBurst")
+      escBurst: n("escBurst"),
+      escMinS: n("escMinS"),
+      escMaxS: n("escMaxS")
     },
     testRows: []
   };
@@ -209,6 +211,8 @@ $("importFile").addEventListener("change", (event) => {
       if (config.esc) {
         $("esc").value = config.esc.esc ?? "";
         $("escBurst").value = config.esc.escBurst ?? "";
+        $("escMinS").value = config.esc.escMinS ?? "";
+        $("escMaxS").value = config.esc.escMaxS ?? "";
       }
 
       if (Array.isArray(config.testRows) && config.testRows.length > 0) {
@@ -261,7 +265,7 @@ $("importFile").addEventListener("change", (event) => {
 
 function check(){
   const kv=n("kv"), capacity=n("capacity"), crate=n("crate");
-  const esc=n("esc"), escBurst=n("escBurst");
+  const esc=n("esc"), escBurst=n("escBurst"), escMinS=n("escMinS"), escMaxS=n("escMaxS");
   const propIn=n("propDiameter"), weight=n("weight"), motors=n("motors"), rpmLimit=n("rpmLimit");
   const sag = n("voltageSag");
   const batteryS = n("batteryS"), motorMinS = n("motorMinS"), motorMaxS = n("motorMaxS");
@@ -275,7 +279,7 @@ function check(){
   const rawMotorAmps = Number(peakRow.querySelector('.row-current').value);
   const rawTestVoltage = Number(peakRow.querySelector('.row-voltage').value);
   
-  const values=[weight, motors, propIn, rpmLimit, kv, batteryS, capacity, crate, esc, escBurst, motorMinS, motorMaxS, rawMotorAmps, rawTestVoltage];
+  const values=[weight, motors, propIn, rpmLimit, kv, batteryS, capacity, crate, esc, escBurst, escMinS, escMaxS, motorMinS, motorMaxS, rawMotorAmps, rawTestVoltage];
   if(values.some(v=>!Number.isFinite(v)||v<=0)){ 
     alert("Please enter positive values in all fields, including the test data rows."); 
     return; 
@@ -286,7 +290,8 @@ function check(){
     return; 
   }
 
-  const isVoltageOk = batteryS >= motorMinS && batteryS <= motorMaxS;
+  const isVoltageForMotorsOk = batteryS >= motorMinS && batteryS <= motorMaxS;
+  const isEscVoltageOk = batteryS >= escMinS && batteryS <= escMaxS;
   
   // Calculate Target Voltages (using 3.7V nominal per cell)
   const nominalBatteryVoltage = batteryS * 3.7;
@@ -344,7 +349,8 @@ function check(){
   const excessHeatRate = burstOverload > 1 ? (Math.pow(burstOverload, 2) - 1) * 100 : 0;
   
   const checks=[
-    ["Battery/Motor Voltage Match", `${batteryS}S`, `Motor accepts ${motorMinS}S to ${motorMaxS}S`, isVoltageOk],
+    ["Battery/Motor Voltage Match", `${batteryS}S`, `Motor accepts ${motorMinS}S to ${motorMaxS}S`, isVoltageForMotorsOk],
+    ["Battery/ESC Voltage Match", `${batteryS}S`, `ESC accepts ${escMinS}S to ${escMaxS}S`, isEscVoltageOk],
     ["Thrust-to-Weight Ratio", `${fmt(twr,1)} : 1`, `Target ≥ ${minTargetTwr.toFixed(1)} : 1 — ${performanceDesc}`, isWeightOk],
     ["Max Safe Weight (AUW)", `${fmt(maxRecommendedWeight, 0)} g`, `Ceiling for TWR ≥ ${minTargetTwr.toFixed(1)} : 1 (Your build: ${fmt(weight, 0)} g)`, isWeightOk],
     ["Estimated loaded RPM", `${fmt(loadedRpm,0)} RPM`, `Limit ≤ ${fmt(rpmLimit,0)} RPM (${fmt(saggedVoltage,1)}V × ${kv}KV × 0.85)`, loadedRpm <= rpmLimit],
