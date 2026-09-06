@@ -298,7 +298,7 @@ function check(){
     ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, `Target thrust (${fmt(targetThrust, 0)} gf) vs max available (${fmt(estimatedTotalThrust, 0)} gf) — limit ≤ ${Math.round(propulsionUtilizationLimit * 100)}%`, isPropulsionUtilizationOk],
     ["Thrust-to-Weight Ratio", `${fmt(twr,1)} : 1`, `Target ≥ ${minTargetTwr.toFixed(1)} : 1 — ${performanceDesc}`, isWeightOk],
     ["Max Safe Weight (AUW)", `${fmt(maxRecommendedWeight, 0)} g`, `Ceiling for TWR ≥ ${minTargetTwr.toFixed(1)} : 1 (Your build: ${fmt(weight, 0)} g)`, isWeightOk],
-    ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, `Target RPM ≤ max allowed RPM ${fmt(rpmLimitFactor * estimatedLoadedRpm, 0)} = limit factor (${fmt(rpmLimitFactor * 100, 1)}%) × peak RPM (${fmt(estimatedLoadedRpm, 0)})`, isTargetRpmOk],
+    ["Target Operational RPM", `${fmt(targetRpm,0)} RPM`, `Target RPM ≤ max allowed RPM ${fmt(rpmLimitFactor * estimatedLoadedRpm, 0)} = limit factor (${fmt(rpmLimitFactor * 100, 1)}%) × peak RPM (${fmt(estimatedLoadedRpm, 0)})`, isTargetRpmOk],
     ["Peak current/motor", `${fmt(scaledMotorAmps,1)} A`, `${fmt(scaledPower,0)} W peak at scaled ${fmt(estimatedUserVoltage,1)}V`, true],
     ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(scaledMotorAmps,1)} A × ${motors}`, true],
     ["ESC burst capability", `${fmt(escBurst,0)} A`, `Peak ${fmt(scaledMotorAmps,1)} A causes ${fmt(excessHeatRate,1)}% excess heat (limit ≤ 10%)`, excessHeatRate <= 10],
