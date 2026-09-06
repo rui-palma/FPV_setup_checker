@@ -3,15 +3,11 @@ const n = id => Number($(id).value);
 
 function fmt(x, digits=1){ return Number.isFinite(x) ? x.toLocaleString(undefined,{maximumFractionDigits:digits}) : "—"; }
 
-let isRpmOverride = false;
-
-
 // --- Row Management for Test Data ---
 $("addRowBtn").addEventListener("click", () => {
   const row = document.createElement("div");
   row.className = "test-row";
   
-  // Use a fixed 40px width for the final column to perfectly match the header
   row.style.display = "grid";
   row.style.gridTemplateColumns = "repeat(5, minmax(0, 1fr)) 36px";
   row.style.gap = "6px";
@@ -42,8 +38,8 @@ $("sortBtn").addEventListener("click", () => {
   rows.forEach(row => container.appendChild(row));
 });
 
-// Function to linearly interpolate/extrapolate current based on target thrust
-function getInterpolatedCurrent(targetThrust, dataPoints) {
+// Generic function to linearly interpolate/extrapolate any property based on target thrust
+function getInterpolatedValue(targetThrust, dataPoints, property) {
   if (targetThrust <= 0) return 0;
   if (dataPoints.length < 2) return 0;
 
@@ -52,15 +48,14 @@ function getInterpolatedCurrent(targetThrust, dataPoints) {
     const p2 = dataPoints[i + 1];
     if (targetThrust >= p1.thrust && targetThrust <= p2.thrust) {
       const fraction = (targetThrust - p1.thrust) / (p2.thrust - p1.thrust);
-      return p1.current + fraction * (p2.current - p1.current);
+      return p1[property] + fraction * (p2[property] - p1[property]);
     }
   }
   
-  // Extrapolate if the target thrust exceeds the highest tested value
   const p1 = dataPoints[dataPoints.length - 2];
   const p2 = dataPoints[dataPoints.length - 1];
   const fraction = (targetThrust - p1.thrust) / (p2.thrust - p1.thrust);
-  return p1.current + fraction * (p2.current - p1.current);
+  return p1[property] + fraction * (p2[property] - p1[property]);
 }
 
 // --- Save and Load Setup ---
@@ -261,10 +256,9 @@ function check(){
   });
   testData.sort((a, b) => a.thrust - b.thrust);
   
-  const totalPower = scaledPower * motors;
   const totalAmps = scaledMotorAmps * motors;
-  const maxNoLoadRpm = estimatedUserVoltage * kv;
-  const estimatedLoadedRpm = maxNoLoadRpm * 0.85;
+  
+  const estimatedLoadedRpm = Math.max(...testData.map(d => d.rpm));
   
   const twr = estimatedTotalThrust / weight;
   const targetThrust = weight * minTargetTwr;
@@ -275,9 +269,15 @@ function check(){
   const isWeightOk = twr >= minTargetTwr && isPropulsionUtilizationOk;
 
   const requiredThrustPerMotor = targetThrust / motors;
-  const rawRequiredAmps = getInterpolatedCurrent(requiredThrustPerMotor, testData);
+  const rawRequiredAmps = getInterpolatedValue(requiredThrustPerMotor, testData, 'current');
   const requiredContinuousAmps = Math.min(rawRequiredAmps, scaledMotorAmps);
   
+  const targetRpm = getInterpolatedValue(requiredThrustPerMotor, testData, 'rpm');
+  // RPM safety margin derived from propulsion utilization (square root relation: RPM proportional to sqrt of thrust)
+  const rpmLimitFactor = Math.sqrt(propulsionUtilizationLimit);
+  const maxAllowedRpmLimit = rpmLimitFactor * estimatedLoadedRpm;
+  const isTargetRpmOk = targetRpm <= maxAllowedRpmLimit;
+
   const maxSafeContinuousAmps = esc * escUtilizationLimit;
   const isContinuousOk = requiredContinuousAmps <= maxSafeContinuousAmps;
   const escUtilizationPct = (requiredContinuousAmps / esc) * 100;
@@ -298,7 +298,7 @@ function check(){
     ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, `Target thrust (${fmt(targetThrust, 0)} gf) vs max available (${fmt(estimatedTotalThrust, 0)} gf) — limit ≤ ${Math.round(propulsionUtilizationLimit * 100)}%`, isPropulsionUtilizationOk],
     ["Thrust-to-Weight Ratio", `${fmt(twr,1)} : 1`, `Target ≥ ${minTargetTwr.toFixed(1)} : 1 — ${performanceDesc}`, isWeightOk],
     ["Max Safe Weight (AUW)", `${fmt(maxRecommendedWeight, 0)} g`, `Ceiling for TWR ≥ ${minTargetTwr.toFixed(1)} : 1 (Your build: ${fmt(weight, 0)} g)`, isWeightOk],
-    ["Estimated Loaded RPM", `${fmt(estimatedLoadedRpm,0)} RPM`, `Approximate operational speed under load (~85% of no-load)`, true],
+    ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, `Target RPM ≤ max allowed RPM ${fmt(rpmLimitFactor * estimatedLoadedRpm, 0)} = limit factor (${fmt(rpmLimitFactor * 100, 1)}%) × peak RPM (${fmt(estimatedLoadedRpm, 0)})`, isTargetRpmOk],
     ["Peak current/motor", `${fmt(scaledMotorAmps,1)} A`, `${fmt(scaledPower,0)} W peak at scaled ${fmt(estimatedUserVoltage,1)}V`, true],
     ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(scaledMotorAmps,1)} A × ${motors}`, true],
     ["ESC burst capability", `${fmt(escBurst,0)} A`, `Peak ${fmt(scaledMotorAmps,1)} A causes ${fmt(excessHeatRate,1)}% excess heat (limit ≤ 10%)`, excessHeatRate <= 10],
@@ -321,5 +321,4 @@ function check(){
   $("results").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
-// Bind button (if not already bound elsewhere)
 $("check").addEventListener("click", check);

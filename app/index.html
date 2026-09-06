@@ -136,16 +136,18 @@
     <details>
       <summary>Formulas used</summary>
       <ul>
-        <li>Estimated total static thrust = Peak 100% throttle thrust (gf) from the test data × number of motors.</li>
-        <li>Thrust-to-weight ratio (TWR) = estimated total static thrust ÷ actual drone weight.</li>
-        <li>Max safe weight (AUW) = estimated total static thrust ÷ minimum target TWR.</li>
-        <li>Estimated loaded RPM ≈ 100% throttle test voltage × KV × 0.85.</li>
-        <li>Total system peak current = Peak 100% throttle current per motor × number of motors.</li>
-        <li>Minimum C-rating = total system peak current ÷ battery capacity (Ah).</li>
-        <li>ESC burst rating evaluates the transient zero-airspeed spike, allowing up to a 10% excess resistive heat rate ((Peak Amps ÷ ESC Burst)&#178; - 1).</li>
-        <li>Propulsion utilization = Target thrust (weight × minimum target TWR) ÷ Estimated total static thrust (limit ≤ 80%).</li>
+        <li>Estimated total static thrust = Scaled peak 100% throttle thrust (gf) from the test data (adjusted by the voltage ratio squared) × number of motors.</li>
+        <li>Thrust-to-weight ratio (TWR) = Estimated total static thrust ÷ actual drone weight.</li>
+        <li>Max safe weight (AUW) = Estimated total static thrust ÷ minimum target TWR.</li>
+        <li>Max loaded RPM = The highest RPM value recorded across the motor test data rows (adjusted by the voltage ratio), replacing the previous 0.85 estimation factor.</li>
+        <li>Target operational RPM = Interpolated RPM value obtained from the motor test data corresponding precisely to the required thrust per motor for a given target TWR.</li>
+        <li>Target RPM limit check = Verifies that the target operational RPM does not exceed the max loaded RPM.</li>
+        <li>Total system peak current = Scaled peak 100% throttle current per motor × number of motors.</li>
+        <li>Minimum C-rating = Total system peak current ÷ battery capacity (Ah).</li>
+        <li>ESC burst rating evaluates the transient zero-airspeed spike, allowing up to a 10% excess resistive heat rate ((Peak Amps ÷ ESC Burst)² - 1).</li>
+        <li>Propulsion utilization = Target thrust (weight × minimum target TWR) ÷ estimated total static thrust (checked against the configured propulsion utilization limit).</li>
         <li>ESC continuous capability and capping = Evaluates the exact interpolated continuous current required to hover, capped so it can never exceed the 100% peak motor current limit.</li>
-        <li>ESC continuous utilization = Required continuous current ÷ ESC continuous rating (limit ≤ 80%).</li>
+        <li>ESC continuous utilization = Required continuous current ÷ ESC continuous rating (checked against the configured ESC utilization limit).</li>
       </ul>
     </details>
   </footer>
