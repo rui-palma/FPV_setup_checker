@@ -200,6 +200,36 @@ $("importFile").addEventListener("change", (event) => {
 });
 
 
+function getTwrMessage(twr, minTargetTwr, utilization, yellowLimit, redLimit, performanceDesc) {
+  const yellowPct = Math.round(yellowLimit * 100);
+  const redPct = Math.round(redLimit * 100);
+
+  if (twr < minTargetTwr) {
+    return `Thrust-to-weight ratio is below the required minimum <br> Agility: ${performanceDesc}`;
+  }
+  if (utilization >= redLimit) {
+    return `The drone's thrust-to-weight ratio is too close to the required minimum (above ${redPct}%) <br> Agility: ${performanceDesc}`;
+  }
+  if (utilization >= yellowLimit) {
+    return `The drone's thrust-to-weight ratio is close to the required minimum (above ${yellowPct}%) <br> Agility: ${performanceDesc}`;
+  }
+  return `Thrust-to-weight ratio is comfortably above the required minimum <br> Agility: ${performanceDesc}`;
+}
+
+function getWeightMessage(utilization, yellowLimit, redLimit) {
+  const yellowPct = Math.round(yellowLimit * 100);
+  const redPct = Math.round(redLimit * 100);
+
+  if (utilization >= redLimit) {
+    return `The drone's weight is too close to the absolute maximum (above ${redPct}%)`;
+  }
+  if (utilization >= yellowLimit) {
+    return `The drone's weight is close to the absolute maximum (above ${yellowLimit}%)`;
+  }
+  return `The drone's weight is comfortably below the absolute maximum`;
+}
+
+
 function check(){
   const kv=n("kv"), capacity=n("capacity"), crate=n("crate");
   const esc=n("esc"), escBurst=n("escBurst"), escMinS=n("escMinS"), escMaxS=n("escMaxS");
@@ -261,7 +291,6 @@ function check(){
   testData.sort((a, b) => a.thrust - b.thrust);
   
   const twr = totalPeakThrust / weight;
-  const maxRecommendedWeight = totalPeakThrust / minTargetTwr;
   const requiredThrustPerMotor = weight * minTargetTwr / motors;
   
   const yellowPropulsionLimit = propulsionUtilizationLimit;
@@ -272,7 +301,7 @@ function check(){
   const redRpmPoint = getInterpolatedValue(redThrustPoint, testData, 'rpm');
   const yellowContinuousAmps = esc * escUtilizationLimit;
   const redContinuousAmps = esc * 0.90;
-  const yellowExcessHeatRate = 10; // 10% above the ESC burst rating
+  const yellowExcessHeatRate = 0; // Anything above 0% of the ESC burst rating
   const redExcessHeatRate = 15; // 15% above the ESC burst rating
 
   const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
@@ -280,7 +309,7 @@ function check(){
   if (propulsionUtilization >= redPropulsionLimit) {
       propulsionStatus = 'bad';
   } else if (propulsionUtilization > yellowPropulsionLimit) {
-      propulsionStatus = 'warn';
+      propulsionStatus = 'warning';
   }
 
   const targetRpm = getInterpolatedValue(requiredThrustPerMotor, testData, 'rpm');
@@ -288,7 +317,7 @@ function check(){
   if (targetRpm >= redRpmPoint) {
       rpmStatus = 'bad';
   } else if (targetRpm > yellowRpmPoint) {
-      rpmStatus = 'warn';
+      rpmStatus = 'warning';
   }
   
   const requiredAmpsPerMotor = getInterpolatedValue(requiredThrustPerMotor, testData, 'current');
@@ -297,7 +326,7 @@ function check(){
   if (requiredContinuousAmpsPerMotor >= redContinuousAmps) {
       continuousAmpsStatus = 'bad';
   } else if (requiredContinuousAmpsPerMotor > yellowContinuousAmps) {
-      continuousAmpsStatus = 'warn';
+      continuousAmpsStatus = 'warning';
   }
   const escUtilizationPct = (requiredContinuousAmpsPerMotor / esc) * 100;
 
@@ -315,25 +344,34 @@ function check(){
   if (excessHeatRate >= redExcessHeatRate) {
       excessHeatRateStatus = 'bad';
   } else if (excessHeatRate > yellowExcessHeatRate) {
-      excessHeatRateStatus = 'warn';
+      excessHeatRateStatus = 'warning';
   }
   
+  const maxWeight = totalPeakThrust / minTargetTwr;
+  const maxRecommendedWeight = maxWeight * yellowPropulsionLimit;
   
-  const getSymbol = (status) => status === 'ok' ? '✅' : status === 'warn' ? '⚠️' : '❌';
-  const getCssClass = (status) => status === 'ok' ? 'ok' : status === 'warn' ? 'warn' : 'bad';
+  const getSymbol = (status) => status === 'ok' ? '✅' : status === 'warning' ? '⚠️' : '❌';
+  const getCssClass = (status) => status === 'ok' ? 'ok' : status === 'warning' ? 'warning' : 'bad';
   
   const checks = [
     ["Battery/Motor Voltage Match", `${batteryS}S`, `Motor accepts ${motorMinS}S to ${motorMaxS}S`, isVoltageForMotorsOk ? 'ok' : 'bad'],
     ["Battery/ESC Voltage Match", `${batteryS}S`, `ESC accepts ${escMinS}S to ${escMaxS}S`, isEscVoltageOk ? 'ok' : 'bad'],
     ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, `(Yellow > ${Math.round(yellowPropulsionLimit * 100)}%, Red > ${Math.round(redPropulsionLimit * 100)}%)`, propulsionStatus],
-    ["Thrust-to-Weight Ratio", `${fmt(twr,1)} : 1`, `Target ≥ ${minTargetTwr.toFixed(1)} — ${performanceDesc}`, propulsionStatus],
-    ["Max Safe Weight (AUW)", `${fmt(maxRecommendedWeight, 0)} g`, `Ceiling for TWR ≥ ${minTargetTwr.toFixed(1)} : 1 (Your build: ${fmt(weight, 0)} g)`, propulsionStatus],
+    ["Thrust-to-Weight Ratio", `${fmt(twr, 1)} : 1`, getTwrMessage(twr, minTargetTwr, propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit, performanceDesc), propulsionStatus],
+    ["Max Safe Weight", `${fmt(maxRecommendedWeight, 0)} g`, [`The maximum possible weight for the minimum required thrust-to-weight ratio is ${maxWeight.toFixed(1)} g.`,
+                                                              `The max safe weight is ${fmt(maxRecommendedWeight, 0)} g, which is ${Math.round(yellowPropulsionLimit * 100)}% of the total max weight.`,
+                                                              `The drone's weight is ${fmt(weight, 0)} g`,
+                                                              getWeightMessage(propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit)].join('<br>'), propulsionStatus],
     ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, `(Yellow > ${fmt(yellowRpmPoint, 0)}) (Red > ${fmt(redRpmPoint, 0)})`, rpmStatus],
-    ["Peak current/motor", `${fmt(peakAmpsPerMotor,1)} A`, `${fmt(peakPowerPerMotor,0)} W peak at scaled ${fmt(peakVoltagePerMotor,1)}V`, 'ok'],
+    ["Peak current/motor", `${fmt(peakAmpsPerMotor,1)} A`, `${fmt(peakPowerPerMotor,0)} W peak at ${fmt(peakVoltagePerMotor,1)}V`, 'ok'],
     ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
-    ["ESC burst capability", `${fmt(escBurst,0)} A`, `Peak ${fmt(peakAmpsPerMotor,1)} A causes ${fmt(excessHeatRate,1)}% excess heat (Yellow > ${fmt(yellowExcessHeatRate, 1)}%) (Red > ${fmt(redExcessHeatRate, 1)}%)`, excessHeatRateStatus],
-    ["ESC continuous capability", `${fmt(esc,0)} A`, `Requires ${fmt(requiredContinuousAmpsPerMotor, 1)} A for TWR ${minTargetTwr.toFixed(1)} : 1`, continuousAmpsStatus],
-    ["ESC continuous utilization", `${fmt(escUtilizationPct, 1)}%`, `Current usage is at ${fmt(escUtilizationPct, 1)}% of continuous rating. (Yellow > ${fmt((yellowContinuousAmps/ esc) * 100, 1)}%) (Red > ${fmt((redContinuousAmps/ esc) * 100, 1)}%)`, continuousAmpsStatus],
+    ["ESC burst capability", `${fmt(peakAmpsPerMotor,1)} / ${fmt(escBurst,0)} A`, 
+                                            [`Peak ${fmt(peakAmpsPerMotor,1)} A causes ${fmt(excessHeatRate,1)}% excess heat`,
+                                             `(Yellow > ${fmt(yellowExcessHeatRate, 1)}%) (Red > ${fmt(redExcessHeatRate, 1)}%)`].join('<br>'), excessHeatRateStatus],
+    ["ESC continuous utilization", `${fmt(requiredContinuousAmpsPerMotor, 1)} / ${fmt(esc,0)} A`,
+                                            [`Requires ${fmt(requiredContinuousAmpsPerMotor, 1)} A for maintaining the target thrust-to-weight ratio of ${minTargetTwr.toFixed(1)} : 1`,
+                                             `This is ${fmt(escUtilizationPct, 1)}% of the ESC continuous rating of ${fmt(esc,0)} A`,
+                                             `(Yellow > ${fmt((yellowContinuousAmps/ esc) * 100, 1)}%) (Red > ${fmt((redContinuousAmps/ esc) * 100, 1)}%)`].join('<br>'), continuousAmpsStatus],
     ["Battery minimum C-rating", `${fmt(minC,1)} C`, "Total amps ÷ capacity", crate >= minC ? 'ok' : 'bad']
   ];
 
@@ -345,7 +383,7 @@ function check(){
     </div>`).join("");
 
   const allOk = checks.every(c => c[3] === 'ok');
-  const hasWarnings = checks.some(c => c[3] === 'warn');
+  const hasWarnings = checks.some(c => c[3] === 'warning');
   const hasErrors = checks.some(c => c[3] === 'bad');
   
   $("overall").textContent = hasErrors ? "SETUP NEEDS ATTENTION" : hasWarnings ? "SETUP HAS WARNINGS" : "SETUP APPEARS OK";
