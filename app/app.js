@@ -252,14 +252,63 @@ function check(){
   const peakLoadedRPMFromTest = Number(peakRow.querySelector('.row-rpm').value);
   
   const values=[weight, motors, propIn, kv, batteryS, capacity, crate, esc, escBurst, escMinS, escMaxS, motorMinS, motorMaxS, testBatteryS, peakAmpsPerMotorFromTest, peakVoltagePerMotorFromTest, peakThrustPerMotorFromTest];
+  
+  // Validations
   if(values.some(v=>!Number.isFinite(v)||v<=0)){ 
     alert("Please enter positive values in all fields, including the test data rows."); 
     return; 
   }
-  
   if(escBurst < esc) { 
     alert("The ESC's peak burst rating must be greater than or equal to its continuous rating."); 
     return; 
+  }
+  if (motorMinS > motorMaxS) {
+    alert("Motor minimum cells cannot be greater than maximum cells.");
+    return;
+  }
+  if (escMinS > escMaxS) {
+    alert("ESC minimum cells cannot be greater than maximum cells.");
+    return;
+  }
+  if (testBatteryS < motorMinS || testBatteryS > motorMaxS) {
+    alert(`Test battery (${testBatteryS}S) must be within the motor's supported range (${motorMinS}S - ${motorMaxS}S).`);
+    return;
+  }
+  
+  // 1. Extract raw motor test data
+  const rawRows = Array.from(document.querySelectorAll('.test-row')).map(row => ({
+    throttle: Number(row.querySelector('.row-throttle').value) || 0,
+    thrust: Number(row.querySelector('.row-thrust').value) || 0,
+    current: Number(row.querySelector('.row-current').value) || 0,
+    rpm: Number(row.querySelector('.row-rpm').value) || 0
+  }));
+
+  // Check for invalid throttle inputs
+  if (rawRows.some(r => r.throttle > 100)) {
+    alert("Throttle levels cannot exceed 100%.");
+    return;
+  }
+  
+  // Sort ascending by throttle
+  rawRows.sort((a, b) => a.throttle - b.throttle);
+  
+  for (let i = 0; i < rawRows.length - 1; i++) {
+    const currentData = rawRows[i];
+    const nextData = rawRows[i + 1];
+    
+    if (currentData.thrust > nextData.thrust) {
+      alert(`Data error: Thrust decreases from ${currentData.thrust}gf to ${nextData.thrust}gf as throttle increases.`);
+      return;
+    }
+    if (currentData.current > nextData.current) {
+      alert(`Data error: Current decreases from ${currentData.current}A to ${nextData.current}A as throttle increases.`);
+      return;
+    }
+    // RPM is technically optional in the UI, but if provided, it shouldn't decrease
+    if (currentData.rpm > nextData.rpm && currentData.rpm > 0) {
+      alert(`Data error: RPM decreases from ${currentData.rpm} to ${nextData.rpm} as throttle increases.`);
+      return;
+    }
   }
 
   const isVoltageForMotorsOk = batteryS >= motorMinS && batteryS <= motorMaxS;
@@ -275,16 +324,12 @@ function check(){
   const totalAmps = peakAmpsPerMotor * motors;
 
   const testData = [{ thrust: 0, current: 0, rpm: 0 }]; 
-  document.querySelectorAll('.test-row').forEach(row => {
-    const rawThrust = Number(row.querySelector('.row-thrust').value);
-    const rawCurrent = Number(row.querySelector('.row-current').value);
-    const rawRpm = Number(row.querySelector('.row-rpm').value) || 0;
-    
-    if (rawThrust > 0 && rawCurrent > 0) {
+  rawRows.forEach(row => {
+    if (row.thrust > 0 && row.current > 0) {
       testData.push({ 
-        thrust: rawThrust * Math.pow(voltageRatio, 2), 
-        current: rawCurrent * Math.pow(voltageRatio, 2),
-        rpm: rawRpm * voltageRatio
+        thrust: row.thrust * Math.pow(voltageRatio, 2), 
+        current: row.current * Math.pow(voltageRatio, 2),
+        rpm: row.rpm * voltageRatio
       });
     }
   });
