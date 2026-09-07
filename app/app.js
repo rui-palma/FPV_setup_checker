@@ -241,7 +241,6 @@ function check(){
   const peakLoadedRPM = peakLoadedRPMFromTest * voltageRatio;
   const peakPowerPerMotor = peakAmpsPerMotor * peakVoltagePerMotor;
   
-  // "total" means it accounts for all motors
   const totalPeakThrust = peakThrustPerMotor * motors;
   const totalAmps = peakAmpsPerMotor * motors;
 
@@ -265,38 +264,40 @@ function check(){
   const maxRecommendedWeight = totalPeakThrust / minTargetTwr;
   const requiredThrustPerMotor = weight * minTargetTwr / motors;
   
+  const yellowPropulsionLimit = propulsionUtilizationLimit;
+  const redPropulsionLimit = 0.9;
+  const yellowThrustPoint = peakThrustPerMotor * yellowPropulsionLimit;
+  const redThrustPoint = peakThrustPerMotor * redPropulsionLimit;
+  const yellowRpmPoint = getInterpolatedValue(yellowThrustPoint, testData, 'rpm');
+  const redRpmPoint = getInterpolatedValue(redThrustPoint, testData, 'rpm');
+  const yellowContinuousAmps = esc * escUtilizationLimit;
+  const redContinuousAmps = esc * 0.90;
+
   const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
-  const redPropulsionLimit = 0.9; // 90% of peak thrust
   let propulsionStatus = 'ok';
   if (propulsionUtilization >= redPropulsionLimit) {
-      propulsionStatus = 'bad'
+      propulsionStatus = 'bad';
+  } else if (propulsionUtilization > yellowPropulsionLimit) {
+      propulsionStatus = 'warn';
   }
-  else if (propulsionUtilization > propulsionUtilizationLimit) {
-      propulsionStatus = 'warn'
-  }
-  const isWeightOk = twr * propulsionUtilization >= minTargetTwr && propulsionStatus !== 'bad';
 
-  
-  const rawRequiredAmps = getInterpolatedValue(requiredThrustPerMotor, testData, 'current');
-  const requiredContinuousAmps = Math.min(rawRequiredAmps, peakAmpsPerMotor);
-  
   const targetRpm = getInterpolatedValue(requiredThrustPerMotor, testData, 'rpm');
-  // RPM safety margin derived from propulsion utilization (square root relation: RPM proportional to sqrt of thrust)
-  const rpmGreenLimitFactor = Math.sqrt(propulsionUtilizationLimit);
-  const rpmRedLimitFactor = Math.sqrt(redPropulsionLimit);
-  const maxAllowedRpmLimit = rpmRedLimitFactor * peakLoadedRPM;
   let rpmStatus = 'ok';
-  if (targetRpm >= rpmRedLimitFactor * peakLoadedRPM) {
-      rpmStatus = 'bad'
+  if (targetRpm >= redRpmPoint) {
+      rpmStatus = 'bad';
+  } else if (targetRpm > yellowRpmPoint) {
+      rpmStatus = 'warn';
   }
-  else if (targetRpm > rpmGreenLimitFactor * peakLoadedRPM) {
-      rpmStatus = 'warn'
+  
+  const requiredAmpsPerMotor = getInterpolatedValue(requiredThrustPerMotor, testData, 'current');
+  const requiredContinuousAmpsPerMotor = Math.min(requiredAmpsPerMotor, peakAmpsPerMotor);
+  let continuousAmpsStatus = 'ok';
+  if (requiredContinuousAmpsPerMotor >= redContinuousAmps) {
+      continuousAmpsStatus = 'bad';
+  } else if (requiredContinuousAmpsPerMotor > yellowContinuousAmps) {
+      continuousAmpsStatus = 'warn';
   }
-  const isTargetRpmOk = rpmStatus !== 'bad';
-
-  const maxSafeContinuousAmps = esc * escUtilizationLimit;
-  const isContinuousOk = requiredContinuousAmps <= maxSafeContinuousAmps;
-  const escUtilizationPct = (requiredContinuousAmps / esc) * 100;
+  const escUtilizationPct = (requiredContinuousAmpsPerMotor / esc) * 100;
 
   let performanceDesc = "Optimal";
   if (twr > 6.0) performanceDesc = "Very agile";
@@ -315,15 +316,15 @@ function check(){
   const checks = [
     ["Battery/Motor Voltage Match", `${batteryS}S`, `Motor accepts ${motorMinS}S to ${motorMaxS}S`, isVoltageForMotorsOk ? 'ok' : 'bad'],
     ["Battery/ESC Voltage Match", `${batteryS}S`, `ESC accepts ${escMinS}S to ${escMaxS}S`, isEscVoltageOk ? 'ok' : 'bad'],
-    ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, `(Yellow > ${Math.round(propulsionUtilizationLimit * 100)}%, Red > ${Math.round(redPropulsionLimit * 100)}%)`, propulsionStatus],
+    ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, `(Yellow > ${Math.round(yellowPropulsionLimit * 100)}%, Red > ${Math.round(redPropulsionLimit * 100)}%)`, propulsionStatus],
     ["Thrust-to-Weight Ratio", `${fmt(twr,1)} : 1`, `Target ≥ ${minTargetTwr.toFixed(1)} — ${performanceDesc}`, propulsionStatus],
     ["Max Safe Weight (AUW)", `${fmt(maxRecommendedWeight, 0)} g`, `Ceiling for TWR ≥ ${minTargetTwr.toFixed(1)} : 1 (Your build: ${fmt(weight, 0)} g)`, propulsionStatus],
-    ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, `(Yellow > ${fmt(rpmGreenLimitFactor * peakLoadedRPM, 0)}) (Red > ${fmt(rpmRedLimitFactor * peakLoadedRPM, 0)})`, rpmStatus],
+    ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, `(Yellow > ${fmt(yellowRpmPoint, 0)}) (Red > ${fmt(redRpmPoint, 0)})`, rpmStatus],
     ["Peak current/motor", `${fmt(peakAmpsPerMotor,1)} A`, `${fmt(peakPowerPerMotor,0)} W peak at scaled ${fmt(peakVoltagePerMotor,1)}V`, 'ok'],
     ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
     ["ESC burst capability", `${fmt(escBurst,0)} A`, `Peak ${fmt(peakAmpsPerMotor,1)} A causes ${fmt(excessHeatRate,1)}% excess heat (limit ≤ 10%)`, excessHeatRate <= 10 ? 'ok' : 'bad'],
-    ["ESC continuous capability", `${fmt(esc,0)} A`, `Requires ${fmt(requiredContinuousAmps, 1)} A for TWR ${minTargetTwr.toFixed(1)} : 1`, isContinuousOk ? 'ok' : 'bad'],
-    ["ESC continuous utilization", `${fmt(escUtilizationPct, 1)}%`, `Current usage is at ${fmt(escUtilizationPct, 1)}% of continuous rating`, isContinuousOk ? 'ok' : 'bad'],
+    ["ESC continuous capability", `${fmt(esc,0)} A`, `Requires ${fmt(requiredContinuousAmpsPerMotor, 1)} A for TWR ${minTargetTwr.toFixed(1)} : 1`, continuousAmpsStatus],
+    ["ESC continuous utilization", `${fmt(escUtilizationPct, 1)}%`, `Current usage is at ${fmt(escUtilizationPct, 1)}% of continuous rating. (Yellow > ${fmt((yellowContinuousAmps/ esc) * 100, 1)}%) (Red > ${fmt((redContinuousAmps/ esc) * 100, 1)}%)`, continuousAmpsStatus],
     ["Battery minimum C-rating", `${fmt(minC,1)} C`, "Total amps ÷ capacity", crate >= minC ? 'ok' : 'bad']
   ];
 
