@@ -272,6 +272,8 @@ function check(){
   const redRpmPoint = getInterpolatedValue(redThrustPoint, testData, 'rpm');
   const yellowContinuousAmps = esc * escUtilizationLimit;
   const redContinuousAmps = esc * 0.90;
+  const yellowExcessHeatRate = 10; // 10% above the ESC burst rating
+  const redExcessHeatRate = 15; // 15% above the ESC burst rating
 
   const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
   let propulsionStatus = 'ok';
@@ -309,6 +311,13 @@ function check(){
   const minC = totalAmps / capacity;
   const burstOverload = peakAmpsPerMotor / escBurst;
   const excessHeatRate = burstOverload > 1 ? (Math.pow(burstOverload, 2) - 1) * 100 : 0;
+  let excessHeatRateStatus = 'ok';
+  if (excessHeatRate >= redExcessHeatRate) {
+      excessHeatRateStatus = 'bad';
+  } else if (excessHeatRate > yellowExcessHeatRate) {
+      excessHeatRateStatus = 'warn';
+  }
+  
   
   const getSymbol = (status) => status === 'ok' ? '✅' : status === 'warn' ? '⚠️' : '❌';
   const getCssClass = (status) => status === 'ok' ? 'ok' : status === 'warn' ? 'warn' : 'bad';
@@ -322,7 +331,7 @@ function check(){
     ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, `(Yellow > ${fmt(yellowRpmPoint, 0)}) (Red > ${fmt(redRpmPoint, 0)})`, rpmStatus],
     ["Peak current/motor", `${fmt(peakAmpsPerMotor,1)} A`, `${fmt(peakPowerPerMotor,0)} W peak at scaled ${fmt(peakVoltagePerMotor,1)}V`, 'ok'],
     ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
-    ["ESC burst capability", `${fmt(escBurst,0)} A`, `Peak ${fmt(peakAmpsPerMotor,1)} A causes ${fmt(excessHeatRate,1)}% excess heat (limit ≤ 10%)`, excessHeatRate <= 10 ? 'ok' : 'bad'],
+    ["ESC burst capability", `${fmt(escBurst,0)} A`, `Peak ${fmt(peakAmpsPerMotor,1)} A causes ${fmt(excessHeatRate,1)}% excess heat (Yellow > ${fmt(yellowExcessHeatRate, 1)}%) (Red > ${fmt(redExcessHeatRate, 1)}%)`, excessHeatRateStatus],
     ["ESC continuous capability", `${fmt(esc,0)} A`, `Requires ${fmt(requiredContinuousAmpsPerMotor, 1)} A for TWR ${minTargetTwr.toFixed(1)} : 1`, continuousAmpsStatus],
     ["ESC continuous utilization", `${fmt(escUtilizationPct, 1)}%`, `Current usage is at ${fmt(escUtilizationPct, 1)}% of continuous rating. (Yellow > ${fmt((yellowContinuousAmps/ esc) * 100, 1)}%) (Red > ${fmt((redContinuousAmps/ esc) * 100, 1)}%)`, continuousAmpsStatus],
     ["Battery minimum C-rating", `${fmt(minC,1)} C`, "Total amps ÷ capacity", crate >= minC ? 'ok' : 'bad']
