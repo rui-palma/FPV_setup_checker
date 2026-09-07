@@ -280,6 +280,7 @@ function check(){
     throttle: Number(row.querySelector('.row-throttle').value) || 0,
     thrust: Number(row.querySelector('.row-thrust').value) || 0,
     current: Number(row.querySelector('.row-current').value) || 0,
+    voltage: Number(row.querySelector('.row-voltage').value) || 0,
     rpm: Number(row.querySelector('.row-rpm').value) || 0
   }));
 
@@ -309,6 +310,45 @@ function check(){
       alert(`Data error: RPM decreases from ${currentData.rpm} to ${nextData.rpm} as throttle increases.`);
       return;
     }
+  }
+  
+  const minVoltsPerCell = 3.0;
+  const maxVoltsPerCell = 4.4;
+  const expectedMinVoltage = testBatteryS * minVoltsPerCell;
+  const expectedMaxVoltage = testBatteryS * maxVoltsPerCell;
+  const diameterMeters = propIn * 0.0254;  // ------ this should use the manufacturer propeller size, not ours !!!!
+  const airDensity = 1.225;
+  const MAX_PLAUSIBLE_STATIC_CT = 0.30;  // conservative number, just to catch strange user inputs for thrust
+  
+  for (const row of rawRows) {
+    if (row.voltage > 0) { 
+      if (row.voltage < expectedMinVoltage || row.voltage > expectedMaxVoltage) {
+        alert(`Data error: The test voltage (${row.voltage}V) at ${row.throttle}% throttle does not match a ${testBatteryS}S battery. Expected range: ${expectedMinVoltage.toFixed(1)}V to ${expectedMaxVoltage.toFixed(1)}V.`);
+        return;
+      }
+    }
+    
+    // 1. Theoretical KV * Voltage Limit for RPM
+    const effectiveVoltage = row.voltage > 0 ? row.voltage : (testBatteryS * 3.7);
+    const maxTheoreticalRpm = kv * effectiveVoltage;
+    if (row.rpm > maxTheoreticalRpm && row.rpm > 0) {
+      alert(`Data error: Entered RPM (${row.rpm}) exceeds the physical KV limit (${maxTheoreticalRpm.toFixed(0)} RPM) for a ${kv} KV motor at ${effectiveVoltage.toFixed(1)}V.`);
+      return;
+    }
+    
+    // 2. Thrust Coefficient (C_T) Plausibility Check
+    if (row.thrust > 0 && row.rpm > 0) {
+      const rps = row.rpm / 60;
+      const thrustNewtons = row.thrust * 9.80665 / 1000;
+      const calculatedCt = thrustNewtons / (airDensity * Math.pow(rps, 2) * Math.pow(diameterMeters, 4));
+      
+      if (calculatedCt > MAX_PLAUSIBLE_STATIC_CT) {
+        alert(`Data error: Entered thrust (${row.thrust}gf) at ${row.rpm} RPM requires an unrealistic thrust coefficient (${calculatedCt.toFixed(3)}). Please verify your units or inputs.`);
+        return;
+      }
+    }
+    
+    // We don't check current --- theoretically, it could have any arbitrarily high resistance and consume arbitrarily high value of amps (mostly producing heat)
   }
 
   const isVoltageForMotorsOk = batteryS >= motorMinS && batteryS <= motorMaxS;
