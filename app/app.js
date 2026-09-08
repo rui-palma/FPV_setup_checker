@@ -58,6 +58,47 @@ function getInterpolatedValue(targetThrust, dataPoints, property) {
   return p1[property] + fraction * (p2[property] - p1[property]);
 }
 
+const maxPlausibleRpmByPropDiameter = {
+    2: 90000,
+    3: 40000,
+    4: 35000,
+    5: 33000,
+    6: 32500,
+    7: 25500,
+    8: 21500,
+    9: 18000,
+    10: 16000,
+    11: 14500,
+    12: 13500,
+    13: 13000,
+    14: 10500,
+    15: 10000,
+    16: 9000,
+    17: 8500,
+    18: 7500,
+    19: 7000,
+    20: 6500
+};
+
+function interpolatePropRpmLimit(diameter) {
+    const keys = Object.keys(maxPlausibleRpmByPropDiameter).map(Number).sort((a, b) => a - b);
+    if (diameter <= keys[0]) return maxPlausibleRpmByPropDiameter[keys[0]];
+    if (diameter >= keys[keys.length - 1]) return maxPlausibleRpmByPropDiameter[keys[keys.length - 1]];
+
+    for (let i = 0; i < keys.length - 1; i++) {
+        const k1 = keys[i];
+        const k2 = keys[i + 1];
+        if (diameter >= k1 && diameter <= k2) {
+            const v1 = maxPlausibleRpmByPropDiameter[k1];
+            const v2 = maxPlausibleRpmByPropDiameter[k2];
+            const fraction = (diameter - k1) / (k2 - k1);
+            return v1 + fraction * (v2 - v1);
+        }
+    }
+    return 10000;
+}
+
+
 // --- Save and Load Setup ---
 $("exportBtn").addEventListener("click", () => {
   const config = {
@@ -74,7 +115,8 @@ $("exportBtn").addEventListener("click", () => {
       kv: n("kv"),
       motorMinS: n("motorMinS"),
       motorMaxS: n("motorMaxS"),
-      testBatteryS: n("testBatteryS")
+      testBatteryS: n("testBatteryS"),
+      testPropDiameter: n("testPropDiameter")
     },
     battery: {
       batteryS: n("batteryS"),
@@ -136,6 +178,7 @@ $("importFile").addEventListener("change", (event) => {
         $("motorMinS").value = config.motor.motorMinS ?? "";
         $("motorMaxS").value = config.motor.motorMaxS ?? "";
         $("testBatteryS").value = config.motor.testBatteryS ?? "";
+        $("testPropDiameter").value = config.motor.testPropDiameter ?? "";
       }
       if (config.battery) {
         $("batteryS").value = config.battery.batteryS ?? "";
@@ -239,21 +282,17 @@ function check(){
   const propIn=n("propDiameter"), weight=n("weight"), motors=n("motors");
   const batteryS = n("batteryS"), motorMinS = n("motorMinS"), motorMaxS = n("motorMaxS");
   const testBatteryS = n("testBatteryS");
+  const testPropIn = n("testPropDiameter");
   
   const peakRow = document.querySelector('.test-row[data-mandatory="true"]') || document.querySelector('.test-row');
   if (!peakRow) {
     alert("Please ensure the motor test data table is properly loaded.");
     return;
   }
-
-  const peakAmpsPerMotorFromTest = Number(peakRow.querySelector('.row-current').value);
-  const peakVoltagePerMotorFromTest = Number(peakRow.querySelector('.row-voltage').value);
-  const peakThrustPerMotorFromTest = Number(peakRow.querySelector('.row-thrust').value);
-  const peakLoadedRPMFromTest = Number(peakRow.querySelector('.row-rpm').value);
   
-  const values=[weight, motors, propIn, kv, batteryS, capacity, crate, esc, escBurst, escMinS, escMaxS, motorMinS, motorMaxS, testBatteryS, peakAmpsPerMotorFromTest, peakVoltagePerMotorFromTest, peakThrustPerMotorFromTest];
+  const values=[weight, motors, propIn, kv, batteryS, capacity, crate, esc, escBurst, escMinS, escMaxS,
+                motorMinS, motorMaxS, testBatteryS, testPropIn];
   
-  // Validations
   if(values.some(v=>!Number.isFinite(v)||v<=0)){ 
     alert("Please enter positive values in all fields, including the test data rows."); 
     return; 
@@ -275,7 +314,6 @@ function check(){
     return;
   }
   
-  // 1. Extract raw motor test data
   const rawRows = Array.from(document.querySelectorAll('.test-row')).map(row => ({
     throttle: Number(row.querySelector('.row-throttle').value) || 0,
     thrust: Number(row.querySelector('.row-thrust').value) || 0,
@@ -284,13 +322,11 @@ function check(){
     rpm: Number(row.querySelector('.row-rpm').value) || 0
   }));
 
-  // Check for invalid throttle inputs
   if (rawRows.some(r => r.throttle > 100)) {
     alert("Throttle levels cannot exceed 100%.");
     return;
   }
   
-  // Sort ascending by throttle
   rawRows.sort((a, b) => a.throttle - b.throttle);
   
   for (let i = 0; i < rawRows.length - 1; i++) {
@@ -305,7 +341,6 @@ function check(){
       alert(`Data error: Current decreases from ${currentData.current}A to ${nextData.current}A as throttle increases.`);
       return;
     }
-    // RPM is technically optional in the UI, but if provided, it shouldn't decrease
     if (currentData.rpm > nextData.rpm && currentData.rpm > 0) {
       alert(`Data error: RPM decreases from ${currentData.rpm} to ${nextData.rpm} as throttle increases.`);
       return;
@@ -316,48 +351,51 @@ function check(){
   const maxVoltsPerCell = 4.4;
   const expectedMinVoltage = testBatteryS * minVoltsPerCell;
   const expectedMaxVoltage = testBatteryS * maxVoltsPerCell;
-  const diameterMeters = propIn * 0.0254;  // ------ this should use the manufacturer propeller size, not ours !!!!
+  const testPropDiameterMeters = testPropIn * 0.0254;
   const airDensity = 1.225;
-  const MAX_PLAUSIBLE_STATIC_CT = 0.30;  // conservative number, just to catch strange user inputs for thrust
+  const MAX_PLAUSIBLE_STATIC_CT = 0.30;   // conservative number, just to catch strange user inputs for thrust
   
   for (const row of rawRows) {
     if (row.voltage > 0) { 
       if (row.voltage < expectedMinVoltage || row.voltage > expectedMaxVoltage) {
-        alert(`Data error: The test voltage (${row.voltage}V) at ${row.throttle}% throttle does not match a ${testBatteryS}S battery. Expected range: ${expectedMinVoltage.toFixed(1)}V to ${expectedMaxVoltage.toFixed(1)}V.`);
+        alert(`Data error: The test voltage (${row.voltage}V) at ${row.throttle}% throttle does not match a ${testBatteryS}S battery.`);
         return;
       }
     }
     
-    // 1. Theoretical KV * Voltage Limit for RPM
     const effectiveVoltage = row.voltage > 0 ? row.voltage : (testBatteryS * 3.7);
-    const maxTheoreticalRpm = kv * effectiveVoltage;
-    if (row.rpm > maxTheoreticalRpm && row.rpm > 0) {
-      alert(`Data error: Entered RPM (${row.rpm}) exceeds the physical KV limit (${maxTheoreticalRpm.toFixed(0)} RPM) for a ${kv} KV motor at ${effectiveVoltage.toFixed(1)}V.`);
+    const kvLimit = kv * effectiveVoltage;
+    const propLimit = interpolatePropRpmLimit(testPropIn);
+    const rpmMargin = 1.15;
+    const hardRpmLimit = Math.min(kvLimit, propLimit * rpmMargin);
+
+    if (row.rpm > hardRpmLimit && row.rpm > 0) {
+      alert(`Data error: Entered RPM (${row.rpm}) exceeds maximum physical limit (${hardRpmLimit.toFixed(0)} RPM).`);
       return;
     }
-    
-    // 2. Thrust Coefficient (C_T) Plausibility Check
-    if (row.thrust > 0 && row.rpm > 0) {
-      const rps = row.rpm / 60;
-      const thrustNewtons = row.thrust * 9.80665 / 1000;
-      const calculatedCt = thrustNewtons / (airDensity * Math.pow(rps, 2) * Math.pow(diameterMeters, 4));
-      
-      if (calculatedCt > MAX_PLAUSIBLE_STATIC_CT) {
-        alert(`Data error: Entered thrust (${row.thrust}gf) at ${row.rpm} RPM requires an unrealistic thrust coefficient (${calculatedCt.toFixed(3)}). Please verify your units or inputs.`);
-        return;
-      }
-    }
-    
-    // We don't check current --- theoretically, it could have any arbitrarily high resistance and consume arbitrarily high value of amps (mostly producing heat)
   }
-
+  
+  const correctedPeakRow = rawRows[rawRows.length - 1];
+  const peakAmpsPerMotorFromTest = correctedPeakRow.current;
+  const peakVoltagePerMotorFromTest = correctedPeakRow.voltage > 0 ? correctedPeakRow.voltage : (testBatteryS * 4.2);
+  const peakThrustPerMotorFromTest = correctedPeakRow.thrust;
+  const peakLoadedRPMFromTest = correctedPeakRow.rpm;
+  
   const isVoltageForMotorsOk = batteryS >= motorMinS && batteryS <= motorMaxS;
   const isEscVoltageOk = batteryS >= escMinS && batteryS <= escMaxS;
+  
   const voltageRatio = batteryS / testBatteryS;
-  const peakAmpsPerMotor = peakAmpsPerMotorFromTest * Math.pow(voltageRatio, 2);
-  const peakThrustPerMotor = peakThrustPerMotorFromTest * Math.pow(voltageRatio, 2);
+  const diameterRatio = propIn / testPropIn; 
+  const slipExponent = 1.3;
+  const rpmSlipFactor = Math.pow(1 / diameterRatio, slipExponent);
+
+  const peakLoadedRPM = peakLoadedRPMFromTest * voltageRatio * rpmSlipFactor;
+  const actualRpmRatio = peakLoadedRPM / peakLoadedRPMFromTest;
+
+  const peakThrustPerMotor = peakThrustPerMotorFromTest * Math.pow(actualRpmRatio, 2) * Math.pow(diameterRatio, 4);
+  const peakAmpsPerMotor = peakAmpsPerMotorFromTest * Math.pow(actualRpmRatio, 3) * Math.pow(diameterRatio, 5);
+  
   const peakVoltagePerMotor = peakVoltagePerMotorFromTest * voltageRatio;
-  const peakLoadedRPM = peakLoadedRPMFromTest * voltageRatio;
   const peakPowerPerMotor = peakAmpsPerMotor * peakVoltagePerMotor;
   
   const totalPeakThrust = peakThrustPerMotor * motors;
@@ -366,10 +404,13 @@ function check(){
   const testData = [{ thrust: 0, current: 0, rpm: 0 }]; 
   rawRows.forEach(row => {
     if (row.thrust > 0 && row.current > 0) {
+      const scaledRpm = row.rpm * voltageRatio * rpmSlipFactor;
+      const rowRpmRatio = row.rpm > 0 ? (scaledRpm / row.rpm) : voltageRatio;
+
       testData.push({ 
-        thrust: row.thrust * Math.pow(voltageRatio, 2), 
-        current: row.current * Math.pow(voltageRatio, 2),
-        rpm: row.rpm * voltageRatio
+        thrust: row.thrust * Math.pow(rowRpmRatio, 2) * Math.pow(diameterRatio, 4), 
+        current: row.current * Math.pow(rowRpmRatio, 3) * Math.pow(diameterRatio, 5),
+        rpm: scaledRpm
       });
     }
   });
@@ -386,8 +427,8 @@ function check(){
   const redRpmPoint = getInterpolatedValue(redThrustPoint, testData, 'rpm');
   const yellowContinuousAmps = esc * escUtilizationLimit;
   const redContinuousAmps = esc * 0.90;
-  const yellowExcessHeatRate = 0; // Anything above 0% of the ESC burst rating
-  const redExcessHeatRate = 15; // 15% above the ESC burst rating
+  const yellowExcessHeatRate = 0;  // Anything above 0% of the ESC burst rating
+  const redExcessHeatRate = 15;  // 15% above the ESC burst rating
 
   const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
   let propulsionStatus = 'ok';
@@ -422,7 +463,7 @@ function check(){
   else if (twr >= 2) performanceDesc = "Heavy, becoming underpowered";
   else performanceDesc = "Underpowered (Too Heavy)";
 
-  const minC = totalAmps / capacity;
+  const minC = totalAmps / (capacity / 1000);
   const burstOverload = peakAmpsPerMotor / escBurst;
   const excessHeatRate = burstOverload > 1 ? (Math.pow(burstOverload, 2) - 1) * 100 : 0;
   let excessHeatRateStatus = 'ok';
@@ -444,9 +485,9 @@ function check(){
     ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, `(Yellow > ${Math.round(yellowPropulsionLimit * 100)}%, Red > ${Math.round(redPropulsionLimit * 100)}%)`, propulsionStatus],
     ["Thrust-to-Weight Ratio", `${fmt(twr, 1)} : 1`, getTwrMessage(twr, minTargetTwr, propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit, performanceDesc), propulsionStatus],
     ["Max Safe Weight", `${fmt(maxRecommendedWeight, 0)} g`, [`The maximum possible weight for the minimum required thrust-to-weight ratio is ${maxWeight.toFixed(1)} g.`,
-                                                              `The max safe weight is ${fmt(maxRecommendedWeight, 0)} g, which is ${Math.round(yellowPropulsionLimit * 100)}% of the total max weight.`,
-                                                              `The drone's weight is ${fmt(weight, 0)} g`,
-                                                              getWeightMessage(propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit)].join('<br>'), propulsionStatus],
+                                                            `The max safe weight is ${fmt(maxRecommendedWeight, 0)} g, which is ${Math.round(yellowPropulsionLimit * 100)}% of the total max weight.`,
+                                                            `The drone's weight is ${fmt(weight, 0)} g`,
+                                                            getWeightMessage(propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit)].join('<br>'), propulsionStatus],
     ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, `(Yellow > ${fmt(yellowRpmPoint, 0)}) (Red > ${fmt(redRpmPoint, 0)})`, rpmStatus],
     ["Peak current/motor", `${fmt(peakAmpsPerMotor,1)} A`, `${fmt(peakPowerPerMotor,0)} W peak at ${fmt(peakVoltagePerMotor,1)}V`, 'ok'],
     ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
@@ -467,7 +508,6 @@ function check(){
       <div class="status ${getCssClass(status)}">${detail} — ${status.toUpperCase()}</div>
     </div>`).join("");
 
-  const allOk = checks.every(c => c[3] === 'ok');
   const hasWarnings = checks.some(c => c[3] === 'warning');
   const hasErrors = checks.some(c => c[3] === 'bad');
   
