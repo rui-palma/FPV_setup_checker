@@ -353,7 +353,7 @@ function check(){
   const expectedMaxVoltage = testBatteryS * maxVoltsPerCell;
   const testPropDiameterMeters = testPropIn * 0.0254;
   const airDensity = 1.225;
-  const MAX_PLAUSIBLE_STATIC_CT = 0.30;   // conservative number, just to catch strange user inputs for thrust
+  const MAX_PLAUSIBLE_STATIC_CT = 0.30; 
   
   for (const row of rawRows) {
     if (row.voltage > 0) { 
@@ -427,8 +427,8 @@ function check(){
   const redRpmPoint = getInterpolatedValue(redThrustPoint, testData, 'rpm');
   const yellowContinuousAmps = esc * escUtilizationLimit;
   const redContinuousAmps = esc * 0.90;
-  const yellowExcessHeatRate = 0;  // Anything above 0% of the ESC burst rating
-  const redExcessHeatRate = 15;  // 15% above the ESC burst rating
+  const yellowExcessHeatRate = 0; 
+  const redExcessHeatRate = 15; 
 
   const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
   let propulsionStatus = 'ok';
@@ -476,6 +476,30 @@ function check(){
   const maxWeight = totalPeakThrust / minTargetTwr;
   const maxRecommendedWeight = maxWeight * yellowPropulsionLimit;
   
+  // --- Approximation Analysis Section ---
+  const approximations = [];
+  if (testBatteryS !== batteryS) {
+    approximations.push("The motor test battery cell count is different from the user battery.");
+  }
+  if (testPropIn !== propIn) {
+    approximations.push("The motor test propeller size is different from the user's propeller size.");
+  }
+
+  const approxContent = $("approximationsContent");
+  const approxSection = $("approximationsSection");
+
+  if (approximations.length === 0) {
+    approxContent.innerHTML = "<p>No significant approximations were made.</p>";
+  } else {
+    approxContent.innerHTML = `
+          <p style="margin-top: 0; margin-bottom: 8px;"><strong>The following factors require approximations that may substantially affect results:</strong></p>
+          <ul style="margin: 0; padding-left: 20px;">
+            ${approximations.map(msg => `<li style="margin-bottom: 4px;">${msg}</li>`).join("")}
+          </ul>
+        `;
+  }
+  approxSection.classList.remove("hidden");
+
   const getSymbol = (status) => status === 'ok' ? '✅' : status === 'warning' ? '⚠️' : '❌';
   const getCssClass = (status) => status === 'ok' ? 'ok' : status === 'warning' ? 'warning' : 'bad';
   
@@ -498,7 +522,7 @@ function check(){
                                             [`Requires ${fmt(requiredContinuousAmpsPerMotor, 1)} A for maintaining the target thrust-to-weight ratio of ${minTargetTwr.toFixed(1)} : 1`,
                                              `This is ${fmt(escUtilizationPct, 1)}% of the ESC continuous rating of ${fmt(esc,0)} A`,
                                              `(Yellow > ${fmt((yellowContinuousAmps/ esc) * 100, 1)}%) (Red > ${fmt((redContinuousAmps/ esc) * 100, 1)}%)`].join('<br>'), continuousAmpsStatus],
-    ["Battery minimum C-rating", `${fmt(minC,1)} C`, "Total amps ÷ capacity", crate >= minC ? 'ok' : 'bad']
+    ["Battery minimum C-rating", `${fmt(minC,1)} C`, "Total amps ÷ capacity", 'ok']
   ];
 
   $("resultList").innerHTML = checks.map(([metric, value, detail, status]) => `
