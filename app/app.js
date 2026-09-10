@@ -370,7 +370,7 @@ function check(){
     const hardRpmLimit = Math.min(kvLimit, propLimit * rpmMargin);
 
     if (row.rpm > hardRpmLimit && row.rpm > 0) {
-      alert(`Data error: Entered RPM (${row.rpm}) exceeds maximum physical limit (${hardRpmLimit.toFixed(0)} RPM).`);
+      alert(`Data error: Entered RPM (${row.rpm}) exceeds maximum empirical limit (${hardRpmLimit.toFixed(0)} RPM).`);
       return;
     }
   }
@@ -423,8 +423,6 @@ function check(){
   const redPropulsionLimit = 0.9;
   const yellowThrustPoint = peakThrustPerMotor * yellowPropulsionLimit;
   const redThrustPoint = peakThrustPerMotor * redPropulsionLimit;
-  const yellowRpmPoint = getInterpolatedValue(yellowThrustPoint, testData, 'rpm');
-  const redRpmPoint = getInterpolatedValue(redThrustPoint, testData, 'rpm');
   const yellowContinuousAmps = esc * escUtilizationLimit;
   const redContinuousAmps = esc * 0.90;
   const yellowExcessHeatRate = 0; 
@@ -439,11 +437,20 @@ function check(){
   }
 
   const targetRpm = getInterpolatedValue(requiredThrustPerMotor, testData, 'rpm');
+  const maxNoLoadRpm = kv * (batteryS * 4.2); 
+  
   let rpmStatus = 'ok';
-  if (targetRpm >= redRpmPoint) {
+  let rpmMessage = `The required operational RPM is within physical constraints`;
+  
+  if (targetRpm > maxNoLoadRpm) {
       rpmStatus = 'bad';
-  } else if (targetRpm > yellowRpmPoint) {
+      rpmMessage = "The required operational RPM is above the theoretical no-load maximum";
+  } else if (targetRpm > maxNoLoadRpm * 0.9) {
+      rpmStatus = 'bad';
+      rpmMessage = "The required operational RPM is above 90% of the theoretical no-load maximum. This is practically impossible, and not empircally observed.";
+  } else if (targetRpm > maxNoLoadRpm * 0.8) {
       rpmStatus = 'warning';
+      rpmMessage = "The required operational RPM is above 80% of the theoretical no-load maximum. This is extremely unusual.";
   }
   
   const requiredAmpsPerMotor = getInterpolatedValue(requiredThrustPerMotor, testData, 'current');
@@ -512,7 +519,7 @@ function check(){
                                                             `The max safe weight is ${fmt(maxRecommendedWeight, 0)} g, which is ${Math.round(yellowPropulsionLimit * 100)}% of the total max weight.`,
                                                             `The drone's weight is ${fmt(weight, 0)} g`,
                                                             getWeightMessage(propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit)].join('<br>'), propulsionStatus],
-    ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, `(Yellow > ${fmt(yellowRpmPoint, 0)}) (Red > ${fmt(redRpmPoint, 0)})`, rpmStatus],
+    ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, rpmMessage, rpmStatus],
     ["Peak current/motor", `${fmt(peakAmpsPerMotor,1)} A`, `${fmt(peakPowerPerMotor,0)} W peak at ${fmt(peakVoltagePerMotor,1)}V`, 'ok'],
     ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
     ["ESC burst capability", `${fmt(peakAmpsPerMotor,1)} / ${fmt(escBurst,0)} A`, 
