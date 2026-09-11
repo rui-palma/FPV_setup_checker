@@ -41,13 +41,15 @@
     <h2>Propeller</h2>
     <div class="grid" style="margin-bottom: 14px;">
       <label>Diameter <span>in</span><input id="propDiameter" type="number" min="0" step="0.1" value="13"></label>
+      <div></div> <!-- Forces the field to 50% width -->
     </div>
   </section>
 
   <section class="card">
     <h2>Motor</h2>
     <div class="grid">
-      <label>Motor KV <input id="kv" type="number" min="0" step="1" value="660"></label>
+      <label>Motor KV <span>RPM/V</span><input id="kv" type="number" min="0" step="1" value="660"></label>
+      <div></div> <!-- Forces the field to 50% width -->
     </div>
     <div class="grid" style="margin-top: 14px;">
       <label>Min supported battery cells (e.g. 3 for 3S)<span>S</span><input id="motorMinS" type="number" min="1" step="1" value="4"></label>
@@ -114,6 +116,7 @@
           <input id="escUtilizationLimit" type="number" value="80" readonly>
         </div>
       </label>
+      <div></div> <!-- Forces the field to 50% width -->
     </div>
     <p class="hint">Burst rating handles temporary throttle spikes. Continuous handles sustained forward flight.</p>
   </section>
