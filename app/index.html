@@ -94,7 +94,7 @@
     <h2>Battery</h2>
     <div class="grid">
       <label>Cell count (e.g. 6 for 6S) <span>S</span><input id="batteryS" type="number" min="1" step="1" value="6"></label>
-      <label>Capacity <span>Ah</span><input id="capacity" type="number" min="0" step="0.1" value="5"></label>
+      <label>Capacity <span>mAh</span><input id="capacity" type="number" min="0" step="100" value="5000"></label>
       <label>C-rating <span>C</span><input id="crate" type="number" min="0" step="1" value="50"></label>
     </div>
   </section>
@@ -150,7 +150,7 @@
         <li>Target operational RPM = Interpolated RPM value obtained from the motor test data corresponding precisely to the required thrust per motor for a given target TWR.</li>
         <li>Target RPM limit check = Verifies that the target operational RPM does not exceed the max loaded RPM.</li>
         <li>Total system peak current = Scaled peak 100% throttle current per motor × number of motors.</li>
-        <li>Minimum C-rating = Total system peak current ÷ battery capacity (Ah).</li>
+        <li>Minimum C-rating = Total system peak current ÷ (battery capacity in mAh ÷ 1000).</li>
         <li>ESC burst rating evaluates the transient zero-airspeed spike, allowing up to a 10% excess resistive heat rate ((Peak Amps ÷ ESC Burst)² - 1).</li>
         <li>Propulsion utilization = Target thrust (weight × minimum target TWR) ÷ estimated total static thrust (checked against the configured propulsion utilization limit).</li>
         <li>ESC continuous capability and capping = Evaluates the exact interpolated continuous current required to hover, capped so it can never exceed the 100% peak motor current limit.</li>
