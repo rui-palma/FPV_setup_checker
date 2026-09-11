@@ -430,10 +430,16 @@ function check(){
 
   const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
   let propulsionStatus = 'ok';
+  const yellowPct = Math.round(yellowPropulsionLimit * 100);
+  const redPct = Math.round(redPropulsionLimit * 100);
+  let propulsionMessage = `The required thrust is below ${yellowPct}% of the peak thrust`;
+  
   if (propulsionUtilization >= redPropulsionLimit) {
       propulsionStatus = 'bad';
+      propulsionMessage = `The required thrust is above ${redPct}% of the peak thrust!`;
   } else if (propulsionUtilization > yellowPropulsionLimit) {
       propulsionStatus = 'warning';
+      propulsionMessage = `The required thrust is between ${yellowPct}% to ${redPct}% of the peak thrust!`;
   }
 
   const targetRpm = getInterpolatedValue(requiredThrustPerMotor, testData, 'rpm');
@@ -444,13 +450,13 @@ function check(){
   
   if (targetRpm > maxNoLoadRpm) {
       rpmStatus = 'bad';
-      rpmMessage = "The required operational RPM is above the theoretical no-load maximum";
+      rpmMessage = `The required operational RPM is above the theoretical no-load maximum (${fmt(maxNoLoadRpm, 0)} RPM)`;
   } else if (targetRpm > maxNoLoadRpm * 0.9) {
       rpmStatus = 'bad';
-      rpmMessage = "The required operational RPM is above 90% of the theoretical no-load maximum. This is practically impossible, and not empircally observed.";
+      rpmMessage = `The required operational RPM is above 90% of the theoretical no-load maximum (${fmt(maxNoLoadRpm, 0)} RPM).This is practically impossible, and not empircally observed.`;
   } else if (targetRpm > maxNoLoadRpm * 0.8) {
-      rpmStatus = 'warning';
-      rpmMessage = "The required operational RPM is above 80% of the theoretical no-load maximum. This is extremely unusual.";
+    rpmStatus = 'warning';
+    rpmMessage = `The required operational RPM is above 80% of the theoretical no-load maximum (${fmt(maxNoLoadRpm, 0)} RPM). This is extremely unusual.`;
   }
   
   const requiredAmpsPerMotor = getInterpolatedValue(requiredThrustPerMotor, testData, 'current');
@@ -513,7 +519,7 @@ function check(){
   const checks = [
     ["Battery/Motor Voltage Match", `${batteryS}S`, `Motor accepts ${motorMinS}S to ${motorMaxS}S`, isVoltageForMotorsOk ? 'ok' : 'bad'],
     ["Battery/ESC Voltage Match", `${batteryS}S`, `ESC accepts ${escMinS}S to ${escMaxS}S`, isEscVoltageOk ? 'ok' : 'bad'],
-    ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, `(Yellow > ${Math.round(yellowPropulsionLimit * 100)}%, Red > ${Math.round(redPropulsionLimit * 100)}%)`, propulsionStatus],
+    ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, propulsionMessage, propulsionStatus],
     ["Thrust-to-Weight Ratio", `${fmt(twr, 1)} : 1`, getTwrMessage(twr, minTargetTwr, propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit, performanceDesc), propulsionStatus],
     ["Max Safe Weight", `${fmt(maxRecommendedWeight, 0)} g`, [`The maximum possible weight for the minimum required thrust-to-weight ratio is ${maxWeight.toFixed(1)} g.`,
                                                             `The max safe weight is ${fmt(maxRecommendedWeight, 0)} g, which is ${Math.round(yellowPropulsionLimit * 100)}% of the total max weight.`,
