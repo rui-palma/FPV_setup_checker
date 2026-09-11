@@ -40,7 +40,7 @@
   <section class="card">
     <h2>Propeller</h2>
     <div class="grid" style="margin-bottom: 14px;">
-      <label>Diameter <span>in</span><input id="propDiameter" type="number" min="0" step="0.1" value="13"></label>
+      <label>Diameter <span>in</span><input id="propDiameter" type="number" min="0" step="0.1" value="10"></label>
       <div></div> <!-- Forces the field to 50% width -->
     </div>
   </section>
@@ -48,11 +48,11 @@
   <section class="card">
     <h2>Motor</h2>
     <div class="grid">
-      <label>Motor KV <span>RPM/V</span><input id="kv" type="number" min="0" step="1" value="660"></label>
+      <label>Motor KV <span>RPM/V</span><input id="kv" type="number" min="0" step="1" value="900"></label>
       <div></div> <!-- Forces the field to 50% width -->
     </div>
     <div class="grid" style="margin-top: 14px;">
-      <label>Min supported battery cells (e.g. 3 for 3S)<span>S</span><input id="motorMinS" type="number" min="1" step="1" value="4"></label>
+      <label>Min supported battery cells (e.g. 3 for 3S)<span>S</span><input id="motorMinS" type="number" min="1" step="1" value="3"></label>
       <label>Max supported battery cells (e.g. 6 for 6S)<span>S</span><input id="motorMaxS" type="number" min="1" step="1" value="6"></label>
     </div>
   </section>
@@ -61,7 +61,7 @@
     <h2>Motor Manufacturer Test Data</h2>
     <div class="grid" style="margin-bottom: 14px;">
       <label>Test battery cell count <span>S</span><input id="testBatteryS" type="number" min="1" step="1" value="6"></label>
-      <label>Test propeller diameter <span>in</span><input id="testPropDiameter" type="number" min="0" step="0.1" value="13"></label>
+      <label>Test propeller diameter <span>in</span><input id="testPropDiameter" type="number" min="0" step="0.1" value="10"></label>
     </div>
     <!-- Table Header Row -->
     <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) 36px; gap: 6px; margin-bottom: 8px; text-align: center; font-size: 0.85em; font-weight: bold; color: var(--text-muted, #9ca3af);">
@@ -76,12 +76,11 @@
       <!-- Mandatory 100% throttle row -->
       <div class="test-row" data-mandatory="true" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) 36px; gap: 6px; margin-bottom: 10px; align-items: center;">
         <input type="number" class="row-throttle" value="100" readonly style="text-align: center; padding: 6px 2px; width: 100%;">
-        <input type="number" class="row-thrust" min="0" step="1" value="2500" style="text-align: center; padding: 6px 2px; width: 100%;">
-        <input type="number" class="row-current" min="0" step="0.1" value="49.5" style="text-align: center; padding: 6px 2px; width: 100%;">
-        <input type="number" class="row-voltage" min="0" step="0.1" value="24.0" style="text-align: center; padding: 6px 2px; width: 100%;">
-        <input type="number" class="row-rpm" min="0" step="100" value="12000" style="text-align: center; padding: 6px 2px; width: 100%;">
+        <input type="number" class="row-thrust" min="0" step="1" value="3960" style="text-align: center; padding: 6px 2px; width: 100%;">
+        <input type="number" class="row-current" min="0" step="0.1" value="68" style="text-align: center; padding: 6px 2px; width: 100%;">
+        <input type="number" class="row-voltage" min="0" step="0.1" value="22.1" style="text-align: center; padding: 6px 2px; width: 100%;">
+        <input type="number" class="row-rpm" min="0" step="100" value="14650" style="text-align: center; padding: 6px 2px; width: 100%;">
         <button type="button" class="icon-btn" style="visibility: hidden; width: 36px;" aria-hidden="true">🗑️</button>
-      </div>
       </div>
     </div>
     <div style="display: flex; gap: 10px; margin-top: 14px;">
@@ -103,8 +102,8 @@
   <section class="card">
     <h2>ESC</h2>
     <div class="grid">
-      <label>Continuous rating <span>A</span><input id="esc" type="number" min="0" step="1" value="80"></label>
-      <label>Peak burst rating <span>A</span><input id="escBurst" type="number" min="0" step="1" value="100"></label>
+      <label>Continuous rating <span>A</span><input id="esc" type="number" min="0" step="1" value="60"></label>
+      <label>Peak burst rating <span>A</span><input id="escBurst" type="number" min="0" step="1" value="65"></label>
     </div>
     <div class="grid" style="margin-top: 14px;">
       <label>Min supported cells <span>S</span><input id="escMinS" type="number" min="1" step="1" value="3"></label>
