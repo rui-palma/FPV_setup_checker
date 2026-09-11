@@ -399,7 +399,7 @@ function check(){
   const peakPowerPerMotor = peakAmpsPerMotor * peakVoltagePerMotor;
   
   const totalPeakThrust = peakThrustPerMotor * motors;
-  const totalAmps = peakAmpsPerMotor * motors;
+  const totalPeakAmps = peakAmpsPerMotor * motors;
 
   const testData = [{ thrust: 0, current: 0, rpm: 0 }]; 
   rawRows.forEach(row => {
@@ -476,7 +476,7 @@ function check(){
   else if (twr >= 2) performanceDesc = "Heavy, becoming underpowered";
   else performanceDesc = "Underpowered (Too Heavy)";
 
-  const minC = totalAmps / (capacity / 1000);
+  const minC = totalPeakAmps / (capacity / 1000);
   const burstOverload = peakAmpsPerMotor / escBurst;
   const excessHeatRate = burstOverload > 1 ? (Math.pow(burstOverload, 2) - 1) * 100 : 0;
   let excessHeatRateStatus = 'ok';
@@ -485,6 +485,23 @@ function check(){
   } else if (excessHeatRate > yellowExcessHeatRate) {
       excessHeatRateStatus = 'warning';
   }
+  
+  const yellowCrateLimit = 0.10; // 10% margin
+  const redCrateLimit = 0.20;    // 20% margin
+  const cRatio = minC / crate;
+  let cStatus = 'ok';
+  let cDetail = "";
+  
+  if (cRatio > (1 + redCrateLimit)) {
+    cStatus = 'bad';
+    cDetail = `Requires ${fmt(minC, 1)} C (exceeds ${crate} C rating by more than ${redCrateLimit * 100}%)`;
+  } else if (cRatio > 1 || cRatio > (1 - yellowCrateLimit)) {
+    cStatus = 'warning';
+    cDetail = `Requires ${fmt(minC, 1)} C (rating is close to or exceeds limit; lacks recommended ${yellowCrateLimit * 100}% margin)`;
+  } else {
+    cDetail = `Requires ${fmt(minC, 1)} C (healthy safety margin)`;
+  }
+  
   
   const maxWeight = totalPeakThrust / minTargetTwr;
   const maxRecommendedWeight = maxWeight * yellowPropulsionLimit;
@@ -527,7 +544,7 @@ function check(){
                                                             getWeightMessage(propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit)].join('<br>'), propulsionStatus],
     ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, rpmMessage, rpmStatus],
     ["Peak current/motor", `${fmt(peakAmpsPerMotor,1)} A`, `${fmt(peakPowerPerMotor,0)} W peak at ${fmt(peakVoltagePerMotor,1)}V`, 'ok'],
-    ["Total peak system current", `${fmt(totalAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
+    ["Total peak system current", `${fmt(totalPeakAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
     ["ESC burst capability", `${fmt(peakAmpsPerMotor,1)} / ${fmt(escBurst,0)} A`, 
                                             [`Peak ${fmt(peakAmpsPerMotor,1)} A causes ${fmt(excessHeatRate,1)}% excess heat`,
                                              `(Yellow > ${fmt(yellowExcessHeatRate, 1)}%) (Red > ${fmt(redExcessHeatRate, 1)}%)`].join('<br>'), excessHeatRateStatus],
@@ -535,7 +552,7 @@ function check(){
                                             [`Requires ${fmt(requiredContinuousAmpsPerMotor, 1)} A for maintaining the target thrust-to-weight ratio of ${minTargetTwr.toFixed(1)} : 1`,
                                              `This is ${fmt(escUtilizationPct, 1)}% of the ESC continuous rating of ${fmt(esc,0)} A`,
                                              `(Yellow > ${fmt((yellowContinuousAmps/ esc) * 100, 1)}%) (Red > ${fmt((redContinuousAmps/ esc) * 100, 1)}%)`].join('<br>'), continuousAmpsStatus],
-    ["Battery minimum C-rating", `${fmt(minC,1)} C`, "Total amps ÷ capacity", 'ok']
+    ["Battery C-rating check", `${fmt(minC,1)} / ${crate} C`, cDetail, cStatus]
   ];
 
   $("resultList").innerHTML = checks.map(([metric, value, detail, status]) => `
