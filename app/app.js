@@ -427,9 +427,7 @@ function check(){
   const maxVoltsPerCell = 4.4;
   const expectedMinVoltage = testBatteryS * minVoltsPerCell;
   const expectedMaxVoltage = testBatteryS * maxVoltsPerCell;
-  const testPropDiameterMeters = testPropIn * 0.0254;
-  const airDensity = 1.225;
-  const MAX_PLAUSIBLE_STATIC_CT = 0.30; 
+  const rpmMargin = 1.15;
   
   for (const row of rawRows) {
     if (row.voltage > 0) { 
@@ -441,12 +439,11 @@ function check(){
     
     const effectiveVoltage = row.voltage > 0 ? row.voltage : (testBatteryS * 3.7);
     const kvLimit = kv * effectiveVoltage;
-    const propLimit = interpolatePropRpmLimit(testPropIn);
-    const rpmMargin = 1.15;
-    const hardRpmLimit = Math.min(kvLimit, propLimit * rpmMargin);
+    const testPropLimit = interpolatePropRpmLimit(testPropIn);
+    const hardTestRpmLimit = Math.min(kvLimit, testPropLimit * rpmMargin);
 
-    if (row.rpm > hardRpmLimit && row.rpm > 0) {
-      alert(`Data error: Entered RPM (${row.rpm}) exceeds maximum empirical limit (${hardRpmLimit.toFixed(0)} RPM).`);
+    if (row.rpm > hardTestRpmLimit && row.rpm > 0) {
+      alert(`Data error: Entered RPM (${row.rpm}) exceeds maximum empirical limit (${hardTestRpmLimit.toFixed(0)} RPM).`);
       return;
     }
   }
@@ -503,7 +500,25 @@ function check(){
   const redContinuousAmps = esc * 0.90;
   const yellowExcessHeatRate = 0; 
   const redExcessHeatRate = 15; 
+  
+  // 720,000 represents roughly Mach 0.9 in inches per minute. 
+  // This is the aerodynamic tip-speed limit for modern rigid drone propellers.
+  // Exceeding this limit causes exponential drag increases, massive loss in efficiency, and extreme current spikes.
+  const nominalVoltage = batteryS * 3.7; 
+  const maxSafeRpm = 720000 / (propIn * Math.PI); 
+  const maxSafeKv = Math.floor(maxSafeRpm / nominalVoltage);
 
+  let kvStatus = 'ok';
+  let kvMessage = `Motor KV is safely within aerodynamic limits (Max limit: ${maxSafeKv} KV)`;
+  if (kv > maxSafeKv) {
+    kvStatus = 'bad';
+    kvMessage = `Motor KV exceeds the aerodynamic tip-speed limit! (Max limit: ${maxSafeKv} KV)`;
+  } else if (kv > maxSafeKv * 0.9) {
+    kvStatus = 'warning';
+    kvMessage = `Motor KV is very close to the aerodynamic tip-speed limit (Max limit: ${maxSafeKv} KV)`;
+  }
+  
+  
   const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
   let propulsionStatus = 'ok';
   const yellowPct = Math.round(yellowPropulsionLimit * 100);
@@ -669,6 +684,7 @@ function check(){
   const checks = [
     ["Battery/Motor Voltage Match", `${batteryS}S`, `Motor accepts ${motorMinS}S to ${motorMaxS}S`, isVoltageForMotorsOk ? 'ok' : 'bad'],
     ["Battery/ESC Voltage Match", `${batteryS}S`, `ESC accepts ${escMinS}S to ${escMaxS}S`, isEscVoltageOk ? 'ok' : 'bad'],
+    ["Motor KV Aerodynamic Limit", `${kv} KV`, kvMessage, kvStatus],
     ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, propulsionMessage, propulsionStatus],
     ["Thrust-to-Weight Ratio", `${fmt(twr, 1)} : 1`, getTwrMessage(twr, minTargetTwr, propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit, performanceDesc), propulsionStatus],
     ["Max Safe Weight", `${fmt(maxRecommendedWeight, 0)} g`, [`The maximum possible weight for the minimum required thrust-to-weight ratio is ${maxWeight.toFixed(1)} g.`,
