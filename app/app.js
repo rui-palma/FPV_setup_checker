@@ -666,11 +666,11 @@ function check(){
     ["Total peak system current", `${fmt(totalPeakAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
     ["ESC burst capability", `${fmt(peakAmpsPerMotor,1)} / ${fmt(escBurst,0)} A`, 
                                             [`Peak ${fmt(peakAmpsPerMotor,1)} A causes ${fmt(excessHeatRate,1)}% excess heat`,
-                                             `(Yellow > ${fmt(yellowExcessHeatRate, 1)}%) (Red > ${fmt(redExcessHeatRate, 1)}%)`].join('<br>'), excessHeatRateStatus],
+                                             `(Warning > ${fmt(yellowExcessHeatRate, 1)}%) (Critical > ${fmt(redExcessHeatRate, 1)}%)`].join('<br>'), excessHeatRateStatus],
     ["ESC continuous utilization", `${fmt(requiredContinuousAmpsPerMotor, 1)} / ${fmt(esc,0)} A`,
                                             [`Requires ${fmt(requiredContinuousAmpsPerMotor, 1)} A for maintaining the target thrust-to-weight ratio of ${minTargetTwr.toFixed(1)} : 1`,
                                              `This is ${fmt(escUtilizationPct, 1)}% of the ESC continuous rating of ${fmt(esc,0)} A`,
-                                             `(Yellow > ${fmt((yellowContinuousAmps/ esc) * 100, 1)}%) (Red > ${fmt((redContinuousAmps/ esc) * 100, 1)}%)`].join('<br>'), continuousAmpsStatus],
+                                             `(Warning > ${fmt((yellowContinuousAmps/ esc) * 100, 1)}%) (Critical > ${fmt((redContinuousAmps/ esc) * 100, 1)}%)`].join('<br>'), continuousAmpsStatus],
     ["Battery C-rating check", `${fmt(minC,1)} / ${crate} C`, cDetail, cStatus],
     ["Capacitor Voltage Margin", `${capVoltage} V`, capVoltageDetail, capVoltageStatus],
     ["Capacitance Rating", `${totalCapacitance} µF`, capAmountDetail, capAmountStatus]
