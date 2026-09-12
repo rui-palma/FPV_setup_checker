@@ -162,20 +162,20 @@
     <details>
       <summary>Formulas used</summary>
       <ul>
-        <li>Estimated total static thrust = Scaled peak 100% throttle thrust (gf) from the test data (adjusted by the voltage ratio squared) × number of motors.</li>
-        <li>Thrust-to-weight ratio (TWR) = Estimated total static thrust ÷ actual drone weight.</li>
-        <li>Max safe weight (AUW) = Estimated total static thrust ÷ minimum target TWR.</li>
-        <li>Max loaded RPM = The highest RPM value recorded across the motor test data rows (adjusted by the voltage ratio), replacing the previous 0.85 estimation factor.</li>
-        <li>Target operational RPM = Interpolated RPM value obtained from the motor test data corresponding precisely to the required thrust per motor for a given target TWR.</li>
-        <li>Target RPM limit check = Verifies that the target operational RPM does not exceed the max loaded RPM.</li>
-        <li>Total system peak current = Scaled peak 100% throttle current per motor × number of motors.</li>
-        <li>Minimum C-rating = Total system peak current ÷ (battery capacity in mAh ÷ 1000).</li>
-        <li>ESC burst rating evaluates the transient zero-airspeed spike, allowing up to a 10% excess resistive heat rate ((Peak Amps ÷ ESC Burst)² - 1).</li>
-        <li>Propulsion utilization = Target thrust (weight × minimum target TWR) ÷ estimated total static thrust (checked against the configured propulsion utilization limit).</li>
-        <li>ESC continuous capability and capping = Evaluates the exact interpolated continuous current required to hover, capped so it can never exceed the 100% peak motor current limit.</li>
-        <li>ESC continuous utilization = Required continuous current ÷ ESC continuous rating (checked against the configured ESC utilization limit).</li>
-        <li>Capacitor voltage margin = Checks that capacitor rated voltage exceeds maximum battery voltage (Cell count × 4.2V) with at least a 35% safety margin.</li>
-        <li>Minimum required capacitance = Calculated using $C_{min} = \frac{I_{ripple} \cdot \Delta T}{\Delta V}$, where switching period $\Delta T = \frac{1}{24000\text{ Hz}}$, current ripple $I_{ripple} = 0.22 \times \text{totalPeakAmps}$, and allowed voltage ripple $\Delta V = 0.10 \times V_{max}$. Recommended setup provides $\ge 1.5 \times C_{min}$.</li>
+        <li><strong>Estimated total static thrust</strong> = Scaled peak 100% throttle thrust from test data (adjusted by RPM ratio squared and propeller diameter ratio to the 4th power) × number of motors.</li>
+        <li><strong>Thrust-to-weight ratio (TWR)</strong> = Estimated total static thrust ÷ actual drone weight.</li>
+        <li><strong>Max safe weight</strong> = (Estimated total static thrust ÷ minimum target TWR) × propulsion utilization limit.</li>
+        <li><strong>Max loaded RPM</strong> = Highest RPM value from motor test data, adjusted by the voltage ratio and propeller slip factor.</li>
+        <li><strong>Target operational RPM</strong> = Interpolated RPM value from test data corresponding to the required thrust per motor.</li>
+        <li><strong>Target RPM limit check</strong> = Verifies that target operational RPM does not exceed the theoretical no-load maximum (KV × Max Battery Voltage).</li>
+        <li><strong>Total system peak current</strong> = Scaled peak 100% throttle current (adjusted by RPM ratio cubed and propeller diameter ratio to the 5th power) × number of motors.</li>
+        <li><strong>Minimum C-rating</strong> = Total system peak current ÷ (battery capacity in mAh ÷ 1000).</li>
+        <li><strong>ESC burst rating</strong> = Evaluates transient zero-airspeed spikes. Calculates excess heat rate as ((Peak Amps ÷ ESC Burst)&sup2; - 1) × 100, warning if >0% and critical if >15%.</li>
+        <li><strong>Propulsion utilization</strong> = Target thrust (weight × minimum target TWR) ÷ estimated total static thrust.</li>
+        <li><strong>ESC continuous capability</strong> = Interpolates the continuous current required to maintain target TWR, capped at the peak motor current limit.</li>
+        <li><strong>ESC continuous utilization</strong> = Required continuous current ÷ ESC continuous rating.</li>
+        <li><strong>Capacitor voltage margin</strong> = Checks that capacitor rated voltage exceeds maximum battery voltage (Cell count × 4.2V) with at least a 35% safety margin.</li>
+        <li><strong>Minimum required capacitance</strong> = C_min = (I_ripple × ΔT) ÷ ΔV. Switching period ΔT = 1 ÷ 24000 Hz, current ripple I_ripple = 0.22 × Total Peak Amps, and allowed voltage ripple ΔV = 0.10 × Max Battery Voltage. Recommended setup provides &ge; 1.5 × C_min.</li>
       </ul>
     </details>
   </footer>
