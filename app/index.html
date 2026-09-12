@@ -13,7 +13,7 @@
   <header>
     <div>
       <h1>FPV Drone Setup Checker</h1>
-      <p>Check thrust, RPM, propeller tip speed, ESC current and battery discharge capability.</p>
+      <p>A comprehensive safety and performance constraint checker for custom FPV drone builds.</p>
     </div>
   </header>
 
@@ -117,7 +117,6 @@
       </label>
       <div></div> <!-- Forces the field to 50% width -->
     </div>
-    <p class="hint">Burst rating handles temporary throttle spikes. Continuous handles sustained forward flight.</p>
   </section>
 
   <section class="card">
@@ -136,6 +135,29 @@
     </div>
     <div style="margin-top: 14px;">
       <button id="addCapRowBtn" type="button" class="secondary">➕ Add Capacitor</button>
+    </div>
+    <div style="margin-top: 14px; text-align: right;">
+      <button id="toggleCapAssumptionsBtn" type="button" class="secondary" style="font-size: 0.85em;">⚙️ Display Assumptions</button>
+    </div>
+    <div id="capAssumptions" class="hidden" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border, #374151);">
+      <div class="grid">
+        <label>Switching frequency <span>kHz</span>
+          <div class="input-with-button">
+            <input id="capSwitchingFreq" type="number" value="24" readonly>
+          </div>
+        </label>
+        <label>Allowed voltage ripple <span>%</span>
+          <div class="input-with-button">
+            <input id="capVoltageRipple" type="number" value="10" readonly>
+          </div>
+        </label>
+        <label>Assumed current ripple <span>%</span>
+          <div class="input-with-button">
+            <input id="capCurrentRipple" type="number" value="22" readonly>
+          </div>
+        </label>
+      </div>
+      <p class="hint" style="margin-top: 14px; margin-bottom: 0;">Capacitors are assumed to be low-ESR.</p>
     </div>
   </section>
 

@@ -57,6 +57,9 @@ $("addCapRowBtn").addEventListener("click", () => {
   $("capacitorRows").appendChild(row);
 });
 
+$("toggleCapAssumptionsBtn").addEventListener("click", () => {
+  $("capAssumptions").classList.toggle("hidden");
+});
 
 // Generic function to linearly interpolate/extrapolate any property based on target thrust
 function getInterpolatedValue(targetThrust, dataPoints, property) {
@@ -151,7 +154,12 @@ $("exportBtn").addEventListener("click", () => {
       escUtilizationLimit: n("escUtilizationLimit")
     },
     testRows: [],
-    capacitorRows: []
+    capacitorRows: [],
+    capacitorConfig: {
+      switchingFreq: n("capSwitchingFreq"),
+      voltageRipple: n("capVoltageRipple"),
+      currentRipple: n("capCurrentRipple")
+    }
   };
 
   document.querySelectorAll('.test-row').forEach(row => {
@@ -292,6 +300,12 @@ $("importFile").addEventListener("change", (event) => {
           }
           capContainer.appendChild(row);
         });
+      }
+      
+      if (config.capacitorConfig) {
+        if (config.capacitorConfig.switchingFreq) $("capSwitchingFreq").value = config.capacitorConfig.switchingFreq;
+        if (config.capacitorConfig.voltageRipple) $("capVoltageRipple").value = config.capacitorConfig.voltageRipple;
+        if (config.capacitorConfig.currentRipple) $("capCurrentRipple").value = config.capacitorConfig.currentRipple;
       }
       
       alert("Setup loaded successfully!");
@@ -600,10 +614,10 @@ function check(){
   }
 
   // 2. Capacitance Check
-  const f_sw = 24000;
+  const f_sw = n("capSwitchingFreq") * 1000;
   const delta_T = 1 / f_sw; 
-  const currentRipple = 0.22 * totalPeakAmps;
-  const voltageRipple = 0.1 * maxBatVoltage;
+  const currentRipple = (n("capCurrentRipple") / 100) * totalPeakAmps;
+  const voltageRipple = (n("capVoltageRipple") / 100) * maxBatVoltage;
   
   const minCapFarads = (currentRipple * delta_T) / voltageRipple;
   const minCapUF = minCapFarads * 1000000;
