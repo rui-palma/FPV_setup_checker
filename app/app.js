@@ -38,6 +38,26 @@ $("sortBtn").addEventListener("click", () => {
   rows.forEach(row => container.appendChild(row));
 });
 
+$("addCapRowBtn").addEventListener("click", () => {
+  const row = document.createElement("div");
+  row.className = "cap-row";
+  row.style.display = "grid";
+  row.style.gridTemplateColumns = "1fr 1fr 36px";
+  row.style.gap = "6px";
+  row.style.marginBottom = "10px";
+  row.style.alignItems = "center";
+  
+  row.innerHTML = `
+      <input type="number" class="cap-voltage" min="0" step="0.1" style="text-align: center; padding: 6px 2px; width: 100%;">
+      <input type="number" class="cap-uF" min="0" step="1" style="text-align: center; padding: 6px 2px; width: 100%;">
+      <button type="button" class="icon-btn remove-cap" title="Remove capacitor" style="width: 36px;">🗑️</button>
+    `;
+  
+  row.querySelector(".remove-cap").addEventListener("click", () => row.remove());
+  $("capacitorRows").appendChild(row);
+});
+
+
 // Generic function to linearly interpolate/extrapolate any property based on target thrust
 function getInterpolatedValue(targetThrust, dataPoints, property) {
   if (targetThrust <= 0) return 0;
@@ -130,7 +150,8 @@ $("exportBtn").addEventListener("click", () => {
       escMaxS: n("escMaxS"),
       escUtilizationLimit: n("escUtilizationLimit")
     },
-    testRows: []
+    testRows: [],
+    capacitorRows: []
   };
 
   document.querySelectorAll('.test-row').forEach(row => {
@@ -141,6 +162,14 @@ $("exportBtn").addEventListener("click", () => {
       current: Number(row.querySelector('.row-current').value) || 0,
       voltage: Number(row.querySelector('.row-voltage').value) || 0,
       rpm: Number(row.querySelector('.row-rpm').value) || 0
+    });
+  });
+  
+  document.querySelectorAll('.cap-row').forEach(row => {
+    config.capacitorRows.push({
+      mandatory: row.dataset.mandatory === "true",
+      voltage: Number(row.querySelector('.cap-voltage').value) || 0,
+      uF: Number(row.querySelector('.cap-uF').value) || 0
     });
   });
 
@@ -231,7 +260,40 @@ $("importFile").addEventListener("change", (event) => {
           container.appendChild(row);
         });
       }
+      
+      if (Array.isArray(config.capacitorRows) && config.capacitorRows.length > 0) {
+        const capContainer = $("capacitorRows");
+        capContainer.innerHTML = ""; 
 
+        config.capacitorRows.forEach(capData => {
+          const row = document.createElement("div");
+          row.className = "cap-row";
+          if (capData.mandatory) row.dataset.mandatory = "true";
+
+          row.style.display = "grid";
+          row.style.gridTemplateColumns = "1fr 1fr 36px";
+          row.style.gap = "6px";
+          row.style.marginBottom = "10px";
+          row.style.alignItems = "center";
+
+          if (capData.mandatory) {
+            row.innerHTML = `
+              <input type="number" class="cap-voltage" min="0" step="0.1" value="${capData.voltage}" style="text-align: center; padding: 6px 2px; width: 100%;">
+              <input type="number" class="cap-uF" min="0" step="1" value="${capData.uF}" style="text-align: center; padding: 6px 2px; width: 100%;">
+              <button type="button" class="icon-btn" style="visibility: hidden; width: 36px;" aria-hidden="true">🗑️</button>
+            `;
+          } else {
+            row.innerHTML = `
+              <input type="number" class="cap-voltage" min="0" step="0.1" value="${capData.voltage}" style="text-align: center; padding: 6px 2px; width: 100%;">
+              <input type="number" class="cap-uF" min="0" step="1" value="${capData.uF}" style="text-align: center; padding: 6px 2px; width: 100%;">
+              <button type="button" class="icon-btn remove-cap" title="Remove capacitor" style="width: 36px;">🗑️</button>
+            `;
+            row.querySelector(".remove-cap").addEventListener("click", () => row.remove());
+          }
+          capContainer.appendChild(row);
+        });
+      }
+      
       alert("Setup loaded successfully!");
     } catch (err) {
       alert("Failed to parse the configuration file. Please ensure it is a valid JSON file.");
@@ -502,6 +564,63 @@ function check(){
     cDetail = `Requires ${fmt(minC, 1)} C (healthy safety margin)`;
   }
   
+  // --- Capacitor Analysis ---
+  const capRows = Array.from(document.querySelectorAll('.cap-row')).map(row => ({
+    voltage: Number(row.querySelector('.cap-voltage').value) || 0,
+    uF: Number(row.querySelector('.cap-uF').value) || 0
+  }));
+
+  if (capRows.length === 0) {
+    alert("Please include at least one capacitor.");
+    return;
+  }
+
+  const capVoltage = capRows[0].voltage;
+  if (capRows.some(cap => cap.voltage !== capVoltage)) {
+    alert("The app only supports the case of multiple capacitors with the same voltage rating.");
+    return;
+  }
+
+  const totalCapacitance = capRows.reduce((sum, cap) => sum + cap.uF, 0);
+  const maxBatVoltage = batteryS * 4.2;
+
+  // 1. Voltage Check
+  let capVoltageStatus = 'ok';
+  let capVoltageDetail = '';
+  
+  if (capVoltage < maxBatVoltage) {
+    capVoltageStatus = 'bad';
+    capVoltageDetail = `Capacitor voltage (${capVoltage} V) is less than max battery voltage (${fmt(maxBatVoltage, 1)} V)`;
+  } else if (capVoltage < (maxBatVoltage * 1.35)) {
+    capVoltageStatus = 'warning';
+    capVoltageDetail = `Less than 30% voltage margin compared to the full battery (${fmt(maxBatVoltage, 1)} V)`;
+  } else {
+    capVoltageStatus = 'ok';
+    capVoltageDetail = `More than 30% voltage margin compared to the full battery (${fmt(maxBatVoltage, 1)} V)`;
+  }
+
+  // 2. Capacitance Check
+  const f_sw = 24000;
+  const delta_T = 1 / f_sw; 
+  const currentRipple = 0.22 * totalPeakAmps;
+  const voltageRipple = 0.1 * maxBatVoltage;
+  
+  const minCapFarads = (currentRipple * delta_T) / voltageRipple;
+  const minCapUF = minCapFarads * 1000000;
+
+  let capAmountStatus = 'ok';
+  let capAmountDetail = '';
+
+  if (totalCapacitance < (minCapUF)) {
+    capAmountStatus = 'bad';
+    capAmountDetail = `Total capacitance is critically low (minimum: ${fmt(minCapUF, 0)} µF)`;
+  } else if (totalCapacitance < (1.5 * minCapUF)) {
+    capAmountStatus = 'warning';
+    capAmountDetail = `Total capacitance is marginal (recommended > ${fmt(1.5 * minCapUF, 0)} µF) <br> Dangerously low if below ${fmt(minCapUF, 0)} µF `;
+  } else {
+    capAmountStatus = 'ok';
+    capAmountDetail = `Total capacitance is sufficient <br> Recommended to be above ${fmt(1.5 * minCapUF, 0)} µF <br> Dangerously low if below ${fmt(0.5 * minCapUF, 0)} µF`;
+  }
   
   const maxWeight = totalPeakThrust / minTargetTwr;
   const maxRecommendedWeight = maxWeight * yellowPropulsionLimit;
@@ -552,7 +671,9 @@ function check(){
                                             [`Requires ${fmt(requiredContinuousAmpsPerMotor, 1)} A for maintaining the target thrust-to-weight ratio of ${minTargetTwr.toFixed(1)} : 1`,
                                              `This is ${fmt(escUtilizationPct, 1)}% of the ESC continuous rating of ${fmt(esc,0)} A`,
                                              `(Yellow > ${fmt((yellowContinuousAmps/ esc) * 100, 1)}%) (Red > ${fmt((redContinuousAmps/ esc) * 100, 1)}%)`].join('<br>'), continuousAmpsStatus],
-    ["Battery C-rating check", `${fmt(minC,1)} / ${crate} C`, cDetail, cStatus]
+    ["Battery C-rating check", `${fmt(minC,1)} / ${crate} C`, cDetail, cStatus],
+    ["Capacitor Voltage Margin", `${capVoltage} V`, capVoltageDetail, capVoltageStatus],
+    ["Capacitance Rating", `${totalCapacitance} µF`, capAmountDetail, capAmountStatus]
   ];
 
   $("resultList").innerHTML = checks.map(([metric, value, detail, status]) => `

@@ -120,6 +120,25 @@
     <p class="hint">Burst rating handles temporary throttle spikes. Continuous handles sustained forward flight.</p>
   </section>
 
+  <section class="card">
+    <h2>Capacitor</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 36px; gap: 6px; margin-bottom: 8px; text-align: center; font-size: 0.85em; font-weight: bold; color: var(--text-muted, #9ca3af);">
+      <div>Voltage (V)</div>
+      <div>Capacitance (µF)</div>
+      <div></div>
+    </div>
+    <div id="capacitorRows">
+      <div class="cap-row" data-mandatory="true" style="display: grid; grid-template-columns: 1fr 1fr 36px; gap: 6px; margin-bottom: 10px; align-items: center;">
+        <input type="number" class="cap-voltage" min="0" step="0.1" value="35" style="text-align: center; padding: 6px 2px; width: 100%;">
+        <input type="number" class="cap-uF" min="0" step="1" value="1500" style="text-align: center; padding: 6px 2px; width: 100%;">
+        <button type="button" class="icon-btn" style="visibility: hidden; width: 36px;" aria-hidden="true">🗑️</button>
+      </div>
+    </div>
+    <div style="margin-top: 14px;">
+      <button id="addCapRowBtn" type="button" class="secondary">➕ Add Capacitor</button>
+    </div>
+  </section>
+
   <div style="display: flex; gap: 10px; margin-bottom: 14px;">
     <button id="exportBtn" type="button" class="secondary">💾 Save Setup</button>
     <button id="importBtn" type="button" class="secondary">📂 Load Setup</button>
@@ -155,6 +174,8 @@
         <li>Propulsion utilization = Target thrust (weight × minimum target TWR) ÷ estimated total static thrust (checked against the configured propulsion utilization limit).</li>
         <li>ESC continuous capability and capping = Evaluates the exact interpolated continuous current required to hover, capped so it can never exceed the 100% peak motor current limit.</li>
         <li>ESC continuous utilization = Required continuous current ÷ ESC continuous rating (checked against the configured ESC utilization limit).</li>
+        <li>Capacitor voltage margin = Checks that capacitor rated voltage exceeds maximum battery voltage (Cell count × 4.2V) with at least a 35% safety margin.</li>
+        <li>Minimum required capacitance = Calculated using $C_{min} = \frac{I_{ripple} \cdot \Delta T}{\Delta V}$, where switching period $\Delta T = \frac{1}{24000\text{ Hz}}$, current ripple $I_{ripple} = 0.22 \times \text{totalPeakAmps}$, and allowed voltage ripple $\Delta V = 0.10 \times V_{max}$. Recommended setup provides $\ge 1.5 \times C_{min}$.</li>
       </ul>
     </details>
   </footer>
