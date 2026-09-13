@@ -124,6 +124,23 @@ label span {
     background: #1f2937;
 }
 
+.secondary {
+    border: 1px solid #9ca3af;
+    border-radius: 9px;
+    padding: 11px 14px;
+    background: #fff;
+    color: #111827;
+    font: 600 0.95rem inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.secondary:hover {
+    background: #e5e7eb;
+}
+
 
 /* ========================================
    Results

@@ -3,6 +3,156 @@ const n = id => Number($(id).value);
 
 function fmt(x, digits=1){ return Number.isFinite(x) ? x.toLocaleString(undefined,{maximumFractionDigits:digits}) : "—"; }
 
+// --- Preset Setups ---
+const presetSetups = {
+  "10inch": {
+    "drone": { "weight": 4000, "motors": 4, "minTargetTwr": 2, "propulsionUtilizationLimit": 85 },
+    "propeller": { "propDiameter": 10 },
+    "motor": { "kv": 900, "motorMinS": 3, "motorMaxS": 6, "testBatteryS": 6, "testPropDiameter": 10 },
+    "battery": { "batteryS": 6, "capacity": 5000, "crate": 50 },
+    "esc": { "esc": 60, "escBurst": 65, "escMinS": 3, "escMaxS": 6, "escUtilizationLimit": 80 },
+    "testRows": [
+      { "mandatory": true, "throttle": 100, "thrust": 3960, "current": 68, "voltage": 22.1, "rpm": 14650 },
+      { "mandatory": false, "throttle": 80, "thrust": 3651, "current": 64.2, "voltage": 22.22, "rpm": 13600 },
+      { "mandatory": false, "throttle": 70, "thrust": 3178, "current": 47.34, "voltage": 23.12, "rpm": 12599 },
+      { "mandatory": false, "throttle": 60, "thrust": 2526, "current": 32.18, "voltage": 23.86, "rpm": 11286 },
+      { "mandatory": false, "throttle": 50, "thrust": 1781, "current": 18.25, "voltage": 25.25, "rpm": 9547 },
+      { "mandatory": false, "throttle": 20, "thrust": 128, "current": 0.74, "voltage": 25.32, "rpm": 2984 }
+    ],
+    "capacitorRows": [{ "mandatory": true, "voltage": 35, "uF": 1500 }],
+    "capacitorConfig": { "switchingFreq": 24, "voltageRipple": 10, "currentRipple": 22 }
+  },
+  "13inch": {
+    "drone": { "weight": 4000, "motors": 4, "minTargetTwr": 2, "propulsionUtilizationLimit": 85 },
+    "propeller": { "propDiameter": 13 },
+    "motor": { "kv": 660, "motorMinS": 3, "motorMaxS": 8, "testBatteryS": 6, "testPropDiameter": 13 },
+    "battery": { "batteryS": 6, "capacity": 5000, "crate": 50 },
+    "esc": { "esc": 80, "escBurst": 100, "escMinS": 3, "escMaxS": 8, "escUtilizationLimit": 80 },
+    "testRows": [
+      { "mandatory": true, "throttle": 100, "thrust": 5740, "current": 79.06, "voltage": 21.06, "rpm": 10908 },
+      { "mandatory": false, "throttle": 90, "thrust": 4862, "current": 60, "voltage": 21.36, "rpm": 10129 },
+      { "mandatory": false, "throttle": 80, "thrust": 4044, "current": 45.01, "voltage": 21.59, "rpm": 9328 },
+      { "mandatory": false, "throttle": 70, "thrust": 3265, "current": 31.49, "voltage": 21.79, "rpm": 8377 },
+      { "mandatory": false, "throttle": 60, "thrust": 2512, "current": 21.09, "voltage": 21.95, "rpm": 7343 },
+      { "mandatory": false, "throttle": 50, "thrust": 1750, "current": 12.86, "voltage": 22.09, "rpm": 6199 }
+    ],
+    "capacitorRows": [{ "mandatory": true, "voltage": 35, "uF": 2200 }],
+    "capacitorConfig": { "switchingFreq": 24, "voltageRipple": 10, "currentRipple": 22 }
+  }
+};
+
+function loadConfigData(config, successMessage = "Setup loaded successfully!") {
+  if (config.drone) {
+    $("weight").value = config.drone.weight ?? "";
+    $("motors").value = config.drone.motors ?? "";
+    $("minTargetTwr").value = config.drone.minTargetTwr ?? "2";
+    $("propulsionUtilizationLimit").value = config.drone.propulsionUtilizationLimit ?? "80";
+  }
+  if (config.propeller) {
+    $("propDiameter").value = config.propeller.propDiameter ?? "";
+  }
+  if (config.motor) {
+    $("kv").value = config.motor.kv ?? "";
+    $("motorMinS").value = config.motor.motorMinS ?? "";
+    $("motorMaxS").value = config.motor.motorMaxS ?? "";
+    $("testBatteryS").value = config.motor.testBatteryS ?? "";
+    $("testPropDiameter").value = config.motor.testPropDiameter ?? "";
+  }
+  if (config.battery) {
+    $("batteryS").value = config.battery.batteryS ?? "";
+    $("capacity").value = config.battery.capacity ?? "";
+    $("crate").value = config.battery.crate ?? "";
+  }
+  if (config.esc) {
+    $("esc").value = config.esc.esc ?? "";
+    $("escBurst").value = config.esc.escBurst ?? "";
+    $("escMinS").value = config.esc.escMinS ?? "";
+    $("escMaxS").value = config.esc.escMaxS ?? "";
+    $("escUtilizationLimit").value = config.esc.escUtilizationLimit ?? "80";
+  }
+
+  if (Array.isArray(config.testRows) && config.testRows.length > 0) {
+    const container = $("testDataRows");
+    container.innerHTML = ""; 
+
+    config.testRows.forEach(rowData => {
+      const row = document.createElement("div");
+      row.className = "test-row";
+      if (rowData.mandatory) row.dataset.mandatory = "true";
+
+      row.style.display = "grid";
+      row.style.gridTemplateColumns = "repeat(5, minmax(0, 1fr)) 36px";
+      row.style.gap = "6px";
+      row.style.marginBottom = "10px";
+      row.style.alignItems = "center";
+
+      if (rowData.mandatory) {
+        row.innerHTML = `
+          <input type="number" class="row-throttle" value="${rowData.throttle}" readonly style="text-align: center;">
+          <input type="number" class="row-thrust" min="0" step="1" value="${rowData.thrust}" style="text-align: center;">
+          <input type="number" class="row-current" min="0" step="0.1" value="${rowData.current}" style="text-align: center;">
+          <input type="number" class="row-voltage" min="0" step="0.1" value="${rowData.voltage}" style="text-align: center;">
+          <input type="number" class="row-rpm" min="0" step="100" value="${rowData.rpm ?? ''}" style="text-align: center;">
+          <button type="button" class="icon-btn" style="visibility: hidden;" aria-hidden="true">🗑️</button>
+        `;
+      } else {
+        row.innerHTML = `
+          <input type="number" class="row-throttle" min="0" max="99" step="1" value="${rowData.throttle}" style="text-align: center; padding: 6px 2px; width: 100%;">
+          <input type="number" class="row-thrust" min="0" step="1" value="${rowData.thrust}" style="text-align: center; padding: 6px 2px; width: 100%;">
+          <input type="number" class="row-current" min="0" step="0.1" value="${rowData.current}" style="text-align: center; padding: 6px 2px; width: 100%;">
+          <input type="number" class="row-voltage" min="0" step="0.1" value="${rowData.voltage}" style="text-align: center; padding: 6px 2px; width: 100%;">
+          <input type="number" class="row-rpm" min="0" step="100" value="${rowData.rpm ?? ''}" style="text-align: center; padding: 6px 2px; width: 100%;">
+          <button type="button" class="icon-btn remove-row" title="Remove row" style="width: 36px;">🗑️</button>
+        `;
+        row.querySelector(".remove-row").addEventListener("click", () => row.remove());
+      }
+      container.appendChild(row);
+    });
+  }
+  
+  if (Array.isArray(config.capacitorRows) && config.capacitorRows.length > 0) {
+    const capContainer = $("capacitorRows");
+    capContainer.innerHTML = ""; 
+
+    config.capacitorRows.forEach(capData => {
+      const row = document.createElement("div");
+      row.className = "cap-row";
+      if (capData.mandatory) row.dataset.mandatory = "true";
+
+      row.style.display = "grid";
+      row.style.gridTemplateColumns = "1fr 1fr 36px";
+      row.style.gap = "6px";
+      row.style.marginBottom = "10px";
+      row.style.alignItems = "center";
+
+      if (capData.mandatory) {
+        row.innerHTML = `
+          <input type="number" class="cap-voltage" min="0" step="0.1" value="${capData.voltage}" style="text-align: center; padding: 6px 2px; width: 100%;">
+          <input type="number" class="cap-uF" min="0" step="1" value="${capData.uF}" style="text-align: center; padding: 6px 2px; width: 100%;">
+          <button type="button" class="icon-btn" style="visibility: hidden; width: 36px;" aria-hidden="true">🗑️</button>
+        `;
+      } else {
+        row.innerHTML = `
+          <input type="number" class="cap-voltage" min="0" step="0.1" value="${capData.voltage}" style="text-align: center; padding: 6px 2px; width: 100%;">
+          <input type="number" class="cap-uF" min="0" step="1" value="${capData.uF}" style="text-align: center; padding: 6px 2px; width: 100%;">
+          <button type="button" class="icon-btn remove-cap" title="Remove capacitor" style="width: 36px;">🗑️</button>
+        `;
+        row.querySelector(".remove-cap").addEventListener("click", () => row.remove());
+      }
+      capContainer.appendChild(row);
+    });
+  }
+  
+  if (config.capacitorConfig) {
+    if (config.capacitorConfig.switchingFreq) $("capSwitchingFreq").value = config.capacitorConfig.switchingFreq;
+    if (config.capacitorConfig.voltageRipple) $("capVoltageRipple").value = config.capacitorConfig.voltageRipple;
+    if (config.capacitorConfig.currentRipple) $("capCurrentRipple").value = config.capacitorConfig.currentRipple;
+  }
+
+  alert(successMessage);
+}
+
+
 // --- Row Management for Test Data ---
 $("addRowBtn").addEventListener("click", () => {
   const row = document.createElement("div");
@@ -200,115 +350,7 @@ $("importFile").addEventListener("change", (event) => {
   reader.onload = (e) => {
     try {
       const config = JSON.parse(e.target.result);
-
-      if (config.drone) {
-        $("weight").value = config.drone.weight ?? "";
-        $("motors").value = config.drone.motors ?? "";
-        $("minTargetTwr").value = config.drone.minTargetTwr ?? "2";
-        $("propulsionUtilizationLimit").value = config.drone.propulsionUtilizationLimit ?? "80";
-      }
-      if (config.propeller) {
-        $("propDiameter").value = config.propeller.propDiameter ?? "";
-      }
-      if (config.motor) {
-        $("kv").value = config.motor.kv ?? "";
-        $("motorMinS").value = config.motor.motorMinS ?? "";
-        $("motorMaxS").value = config.motor.motorMaxS ?? "";
-        $("testBatteryS").value = config.motor.testBatteryS ?? "";
-        $("testPropDiameter").value = config.motor.testPropDiameter ?? "";
-      }
-      if (config.battery) {
-        $("batteryS").value = config.battery.batteryS ?? "";
-        $("capacity").value = config.battery.capacity ?? "";
-        $("crate").value = config.battery.crate ?? "";
-      }
-      if (config.esc) {
-        $("esc").value = config.esc.esc ?? "";
-        $("escBurst").value = config.esc.escBurst ?? "";
-        $("escMinS").value = config.esc.escMinS ?? "";
-        $("escMaxS").value = config.esc.escMaxS ?? "";
-        $("escUtilizationLimit").value = config.esc.escUtilizationLimit ?? "80";
-      }
-
-      if (Array.isArray(config.testRows) && config.testRows.length > 0) {
-        const container = $("testDataRows");
-        container.innerHTML = ""; 
-
-        config.testRows.forEach(rowData => {
-          const row = document.createElement("div");
-          row.className = "test-row";
-          if (rowData.mandatory) row.dataset.mandatory = "true";
-
-          row.style.display = "grid";
-          row.style.gridTemplateColumns = "repeat(5, minmax(0, 1fr)) 36px";
-          row.style.gap = "6px";
-          row.style.marginBottom = "10px";
-          row.style.alignItems = "center";
-
-          if (rowData.mandatory) {
-            row.innerHTML = `
-              <input type="number" class="row-throttle" value="${rowData.throttle}" readonly style="text-align: center;">
-              <input type="number" class="row-thrust" min="0" step="1" value="${rowData.thrust}" style="text-align: center;">
-              <input type="number" class="row-current" min="0" step="0.1" value="${rowData.current}" style="text-align: center;">
-              <input type="number" class="row-voltage" min="0" step="0.1" value="${rowData.voltage}" style="text-align: center;">
-              <input type="number" class="row-rpm" min="0" step="100" value="${rowData.rpm ?? ''}" style="text-align: center;">
-              <button type="button" class="icon-btn" style="visibility: hidden;" aria-hidden="true">🗑️</button>
-            `;
-          } else {
-            row.innerHTML = `
-              <input type="number" class="row-throttle" min="0" max="99" step="1" value="${rowData.throttle}" style="text-align: center; padding: 6px 2px; width: 100%;">
-              <input type="number" class="row-thrust" min="0" step="1" value="${rowData.thrust}" style="text-align: center; padding: 6px 2px; width: 100%;">
-              <input type="number" class="row-current" min="0" step="0.1" value="${rowData.current}" style="text-align: center; padding: 6px 2px; width: 100%;">
-              <input type="number" class="row-voltage" min="0" step="0.1" value="${rowData.voltage}" style="text-align: center; padding: 6px 2px; width: 100%;">
-              <input type="number" class="row-rpm" min="0" step="100" value="${rowData.rpm ?? ''}" style="text-align: center; padding: 6px 2px; width: 100%;">
-              <button type="button" class="icon-btn remove-row" title="Remove row" style="width: 36px;">🗑️</button>
-            `;
-            row.querySelector(".remove-row").addEventListener("click", () => row.remove());
-          }
-          container.appendChild(row);
-        });
-      }
-      
-      if (Array.isArray(config.capacitorRows) && config.capacitorRows.length > 0) {
-        const capContainer = $("capacitorRows");
-        capContainer.innerHTML = ""; 
-
-        config.capacitorRows.forEach(capData => {
-          const row = document.createElement("div");
-          row.className = "cap-row";
-          if (capData.mandatory) row.dataset.mandatory = "true";
-
-          row.style.display = "grid";
-          row.style.gridTemplateColumns = "1fr 1fr 36px";
-          row.style.gap = "6px";
-          row.style.marginBottom = "10px";
-          row.style.alignItems = "center";
-
-          if (capData.mandatory) {
-            row.innerHTML = `
-              <input type="number" class="cap-voltage" min="0" step="0.1" value="${capData.voltage}" style="text-align: center; padding: 6px 2px; width: 100%;">
-              <input type="number" class="cap-uF" min="0" step="1" value="${capData.uF}" style="text-align: center; padding: 6px 2px; width: 100%;">
-              <button type="button" class="icon-btn" style="visibility: hidden; width: 36px;" aria-hidden="true">🗑️</button>
-            `;
-          } else {
-            row.innerHTML = `
-              <input type="number" class="cap-voltage" min="0" step="0.1" value="${capData.voltage}" style="text-align: center; padding: 6px 2px; width: 100%;">
-              <input type="number" class="cap-uF" min="0" step="1" value="${capData.uF}" style="text-align: center; padding: 6px 2px; width: 100%;">
-              <button type="button" class="icon-btn remove-cap" title="Remove capacitor" style="width: 36px;">🗑️</button>
-            `;
-            row.querySelector(".remove-cap").addEventListener("click", () => row.remove());
-          }
-          capContainer.appendChild(row);
-        });
-      }
-      
-      if (config.capacitorConfig) {
-        if (config.capacitorConfig.switchingFreq) $("capSwitchingFreq").value = config.capacitorConfig.switchingFreq;
-        if (config.capacitorConfig.voltageRipple) $("capVoltageRipple").value = config.capacitorConfig.voltageRipple;
-        if (config.capacitorConfig.currentRipple) $("capCurrentRipple").value = config.capacitorConfig.currentRipple;
-      }
-      
-      alert("Setup loaded successfully!");
+      loadConfigData(config, "Setup loaded successfully!");
     } catch (err) {
       alert("Failed to parse the configuration file. Please ensure it is a valid JSON file.");
       console.error(err);
@@ -316,6 +358,15 @@ $("importFile").addEventListener("change", (event) => {
   };
   reader.readAsText(file);
   event.target.value = ""; 
+});
+
+$("presetSelect").addEventListener("change", (e) => {
+  const selectedKey = e.target.value;
+  const config = presetSetups[selectedKey];
+  if (config) {
+    loadConfigData(config, "Preset loaded successfully!");
+    e.target.value = ""; 
+  }
 });
 
 
