@@ -309,46 +309,6 @@ function getInterpolatedValue(targetThrust, dataPoints, property) {
   return p1[property] + fraction * (p2[property] - p1[property]);
 }
 
-const maxPlausibleRpmByPropDiameter = {
-    2: 90000,
-    3: 40000,
-    4: 35000,
-    5: 33000,
-    6: 32500,
-    7: 25500,
-    8: 21500,
-    9: 18000,
-    10: 16000,
-    11: 14500,
-    12: 13500,
-    13: 13000,
-    14: 10500,
-    15: 10000,
-    16: 9000,
-    17: 8500,
-    18: 7500,
-    19: 7000,
-    20: 6500
-};
-
-function interpolatePropRpmLimit(diameter) {
-    const keys = Object.keys(maxPlausibleRpmByPropDiameter).map(Number).sort((a, b) => a - b);
-    if (diameter <= keys[0]) return maxPlausibleRpmByPropDiameter[keys[0]];
-    if (diameter >= keys[keys.length - 1]) return maxPlausibleRpmByPropDiameter[keys[keys.length - 1]];
-
-    for (let i = 0; i < keys.length - 1; i++) {
-        const k1 = keys[i];
-        const k2 = keys[i + 1];
-        if (diameter >= k1 && diameter <= k2) {
-            const v1 = maxPlausibleRpmByPropDiameter[k1];
-            const v2 = maxPlausibleRpmByPropDiameter[k2];
-            const fraction = (diameter - k1) / (k2 - k1);
-            return v1 + fraction * (v2 - v1);
-        }
-    }
-    return 10000;
-}
-
 
 // --- Save and Load Setup ---
 $("exportBtn").addEventListener("click", () => {
@@ -556,7 +516,6 @@ function check(){
   const maxVoltsPerCell = 4.4;
   const expectedMinVoltage = testBatteryS * minVoltsPerCell;
   const expectedMaxVoltage = testBatteryS * maxVoltsPerCell;
-  const rpmMargin = 1.15;
   
   for (const row of rawRows) {
     if (row.voltage > 0) { 
@@ -568,11 +527,11 @@ function check(){
     
     const effectiveVoltage = row.voltage > 0 ? row.voltage : (testBatteryS * 3.7);
     const kvLimit = kv * effectiveVoltage;
-    const testPropLimit = interpolatePropRpmLimit(testPropIn);
-    const hardTestRpmLimit = Math.min(kvLimit, testPropLimit * rpmMargin);
+    const maxSafeTestRpm = 720000 / (testPropIn * Math.PI);
+    const hardTestRpmLimit = Math.min(kvLimit, maxSafeTestRpm);
 
     if (row.rpm > hardTestRpmLimit && row.rpm > 0) {
-      alert(`Data error: Entered RPM (${row.rpm}) exceeds maximum empirical limit (${hardTestRpmLimit.toFixed(0)} RPM).`);
+      alert(`Data error: Entered RPM (${row.rpm}) exceeds the maximum theoretical limit (${hardTestRpmLimit.toFixed(0)} RPM).`);
       return;
     }
   }
@@ -627,8 +586,9 @@ function check(){
   const redContinuousAmps = esc * 0.90;
   const yellowExcessHeatRate = 0; 
   const redExcessHeatRate = 15; 
-  
-  const nominalVoltage = batteryS * 3.7; 
+  const nominalVoltage = batteryS * 3.7;
+
+  // --- Max Motor KV Check ---
   const maxSafeRpm = 720000 / (propIn * Math.PI); 
   const maxSafeKv = Math.floor(maxSafeRpm / nominalVoltage);
 
