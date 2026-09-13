@@ -494,8 +494,6 @@ function check(){
   
   const yellowPropulsionLimit = propulsionUtilizationLimit;
   const redPropulsionLimit = 0.9;
-  const yellowThrustPoint = peakThrustPerMotor * yellowPropulsionLimit;
-  const redThrustPoint = peakThrustPerMotor * redPropulsionLimit;
   const yellowContinuousAmps = esc * escUtilizationLimit;
   const redContinuousAmps = esc * 0.90;
   const yellowExcessHeatRate = 0; 
@@ -518,6 +516,7 @@ function check(){
     kvMessage = `Motor KV is very close to the aerodynamic tip-speed limit (Max limit: ${maxSafeKv} KV)`;
   }
   
+  const maxBatVoltage = batteryS * 4.2;
   
   const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
   let propulsionStatus = 'ok';
@@ -611,7 +610,6 @@ function check(){
   }
 
   const totalCapacitance = capRows.reduce((sum, cap) => sum + cap.uF, 0);
-  const maxBatVoltage = batteryS * 4.2;
 
   // 1. Voltage Check
   let capVoltageStatus = 'ok';
