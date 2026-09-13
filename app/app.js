@@ -41,6 +41,69 @@ const presetSetups = {
   }
 };
 
+// --- Min Motor KVs
+const absoluteMinKvTable = {
+  2: { 1: 14000, 2: 7000, 3: 4500, 4: 3500 },
+  3: { 1: 8000, 2: 4500, 3: 3000, 4: 2500, 6: 1600 },
+  4: { 1: 6000, 2: 3000, 3: 2200, 4: 1800, 6: 1400 },
+  5: { 1: 5000, 2: 2500, 3: 2000, 4: 1600, 6: 1200, 8: 900, 12: 600 },
+  6: { 1: 4200, 2: 2100, 3: 1700, 4: 1400, 6: 1000, 8: 750, 12: 500 },
+  7: { 2: 1700, 3: 1400, 4: 1100, 6: 800, 8: 600, 12: 400 },
+  8: { 2: 1400, 3: 1200, 4: 900, 6: 675, 8: 500, 12: 320 },
+  9: { 2: 1200, 3: 1000, 4: 780, 6: 560, 8: 420, 12: 260 },
+  10: { 2: 1000, 3: 900, 4: 700, 6: 450, 8: 350, 12: 220 },
+  11: { 3: 700, 4: 550, 6: 380, 8: 280, 12: 180 },
+  12: { 3: 600, 4: 480, 6: 320, 8: 240, 12: 160 },
+  13: { 3: 500, 4: 400, 6: 280, 8: 200, 12: 140 },
+  14: { 3: 450, 4: 360, 6: 250, 8: 180, 12: 125 },
+  15: { 4: 320, 6: 220, 8: 160, 12: 110 },
+  16: { 6: 200, 8: 145, 12: 100 },
+  17: { 6: 180, 8: 130, 12: 90 },
+  18: { 6: 160, 8: 120, 12: 80 },
+  19: { 6: 150, 8: 110, 12: 75 },
+  20: { 6: 140, 8: 100, 12: 70 }
+};
+
+const practicalMinKvTable = {
+  2: { 1: 18000, 2: 9000, 3: 6000, 4: 4500 },
+  3: { 1: 10000, 2: 6000, 3: 4000, 4: 3200, 6: 2200 },
+  4: { 1: 8000, 2: 4000, 3: 3000, 4: 2400, 6: 1700 },
+  5: { 1: 7000, 2: 3500, 3: 2600, 4: 2100, 6: 1500, 8: 1100, 12: 750 },
+  6: { 1: 5600, 2: 2800, 3: 2100, 4: 1700, 6: 1300, 8: 950, 12: 570 },
+  7: { 2: 2300, 3: 1700, 4: 1300, 6: 980, 8: 750, 12: 450 },
+  8: { 2: 1900, 3: 1400, 4: 1100, 6: 850, 8: 600, 12: 380 },
+  9: { 2: 1600, 3: 1200, 4: 950, 6: 700, 8: 520, 12: 340 },
+  10: { 2: 1400, 3: 1000, 4: 850, 6: 600, 8: 450, 12: 300 },
+  11: { 3: 850, 4: 700, 6: 500, 8: 400, 12: 270 },
+  12: { 3: 750, 4: 600, 6: 450, 8: 350, 12: 250 },
+  13: { 3: 600, 4: 500, 6: 400, 8: 300, 12: 220 },
+  14: { 3: 550, 4: 450, 6: 360, 8: 270, 12: 190 },
+  15: { 4: 400, 6: 320, 8: 240, 12: 170 },
+  16: { 6: 290, 8: 215, 12: 150 },
+  17: { 6: 260, 8: 195, 12: 135 },
+  18: { 6: 230, 8: 175, 12: 120 },
+  19: { 6: 210, 8: 160, 12: 110 },
+  20: { 6: 190, 8: 145, 12: 100 }
+};
+
+function getMinKv(table, prop, cells) {
+  if (!table[prop]) return null;
+  const availableCells = Object.keys(table[prop]).map(Number).sort((a, b) => a - b);
+  if (cells < availableCells[0] || cells > availableCells[availableCells.length - 1]) return null;
+
+  for (let i = 0; i < availableCells.length; i++) {
+    if (cells === availableCells[i]) return table[prop][cells];
+    if (i < availableCells.length - 1 && cells > availableCells[i] && cells < availableCells[i + 1]) {
+      const c1 = availableCells[i];
+      const c2 = availableCells[i + 1];
+      const kv1 = table[prop][c1];
+      const kv2 = table[prop][c2];
+      return kv1 + ((kv2 - kv1) * (cells - c1)) / (c2 - c1);
+    }
+  }
+  return null;
+}
+
 function loadConfigData(config, successMessage = "Setup loaded successfully!") {
   if (config.drone) {
     $("weight").value = config.drone.weight ?? "";
@@ -550,9 +613,6 @@ function check(){
   const yellowExcessHeatRate = 0; 
   const redExcessHeatRate = 15; 
   
-  // 720,000 represents roughly Mach 0.9 in inches per minute. 
-  // This is the aerodynamic tip-speed limit for modern rigid drone propellers.
-  // Exceeding this limit causes exponential drag increases, massive loss in efficiency, and extreme current spikes.
   const nominalVoltage = batteryS * 3.7; 
   const maxSafeRpm = 720000 / (propIn * Math.PI); 
   const maxSafeKv = Math.floor(maxSafeRpm / nominalVoltage);
@@ -567,6 +627,29 @@ function check(){
     kvMessage = `Motor KV is very close to the aerodynamic tip-speed limit (Max limit: ${maxSafeKv} KV)`;
   }
   
+  // --- Min Motor KV Check ---
+  const absMinKv = getMinKv(absoluteMinKvTable, propIn, batteryS);
+  const pracMinKv = getMinKv(practicalMinKvTable, propIn, batteryS);
+
+  let minKvStatus = 'ok';
+  let minKvMessage = '';
+
+  if (absMinKv === null || pracMinKv === null) {
+    minKvStatus = 'irregular';
+    minKvMessage = `This combination of a ${propIn}" prop on ${batteryS}S is so unheard of that it might not even make sense.`;
+  } else {
+    if (kv < absMinKv) {
+      minKvStatus = 'bad';
+      minKvMessage = `KV is below the absolute minimum flight floor (~${Math.round(absMinKv)} KV). The drone will likely not be able to fly.`;
+    } else if (kv < pracMinKv) {
+      minKvStatus = 'warning';
+      minKvMessage = `KV is below the practical minimum (~${Math.round(pracMinKv)} KV). Expect sluggish response, prop wash, and poor stability.`;
+    } else {
+      minKvStatus = 'ok';
+      minKvMessage = `KV is safely above the practical minimum for a ${propIn}" prop on ${batteryS}S (~${Math.round(pracMinKv)} KV).`;
+    }
+  }
+
   const maxBatVoltage = batteryS * 4.2;
   
   const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
@@ -662,10 +745,8 @@ function check(){
 
   const totalCapacitance = capRows.reduce((sum, cap) => sum + cap.uF, 0);
 
-  // 1. Voltage Check
   let capVoltageStatus = 'ok';
   let capVoltageDetail = '';
-  
   if (capVoltage < maxBatVoltage) {
     capVoltageStatus = 'bad';
     capVoltageDetail = `Capacitor voltage (${capVoltage} V) is less than max battery voltage (${fmt(maxBatVoltage, 1)} V)`;
@@ -677,18 +758,15 @@ function check(){
     capVoltageDetail = `More than 30% voltage margin compared to the full battery (${fmt(maxBatVoltage, 1)} V)`;
   }
 
-  // 2. Capacitance Check
   const f_sw = n("capSwitchingFreq") * 1000;
   const delta_T = 1 / f_sw; 
   const currentRipple = (n("capCurrentRipple") / 100) * totalPeakAmps;
   const voltageRipple = (n("capVoltageRipple") / 100) * maxBatVoltage;
-  
   const minCapFarads = (currentRipple * delta_T) / voltageRipple;
   const minCapUF = minCapFarads * 1000000;
 
   let capAmountStatus = 'ok';
   let capAmountDetail = '';
-
   if (totalCapacitance < (minCapUF)) {
     capAmountStatus = 'bad';
     capAmountDetail = `Total capacitance is critically low (minimum: ${fmt(minCapUF, 0)} µF)`;
@@ -711,6 +789,9 @@ function check(){
   if (testPropIn !== propIn) {
     approximations.push("The motor test propeller size is different from the user's propeller size.");
   }
+  if (minKvStatus === 'irregular') {
+    approximations.push(`The combination of a ${propIn}" prop on ${batteryS}S is highly irregular and falls completely outside of standard physics bounds for minimum KV expectations.`);
+  }
 
   const approxContent = $("approximationsContent");
   const approxSection = $("approximationsSection");
@@ -727,13 +808,15 @@ function check(){
   }
   approxSection.classList.remove("hidden");
 
-  const getSymbol = (status) => status === 'ok' ? '✅' : status === 'warning' ? '⚠️' : '❌';
-  const getCssClass = (status) => status === 'ok' ? 'ok' : status === 'warning' ? 'warning' : 'bad';
+  // Format mapping modifications to support the new "irregular" state
+  const getSymbol = (status) => status === 'ok' ? '✅' : status === 'warning' ? '⚠️' : status === 'irregular' ? '⁉️' : '❌';
+  const getCssClass = (status) => status === 'ok' ? 'ok' : status === 'warning' ? 'warning' : status === 'irregular' ? 'irregular' : 'bad';
   
   const checks = [
     ["Battery/Motor Voltage Match", `${batteryS}S`, `Motor accepts ${motorMinS}S to ${motorMaxS}S`, isVoltageForMotorsOk ? 'ok' : 'bad'],
     ["Battery/ESC Voltage Match", `${batteryS}S`, `ESC accepts ${escMinS}S to ${escMaxS}S`, isEscVoltageOk ? 'ok' : 'bad'],
     ["Motor KV Aerodynamic Limit", `${kv} KV`, kvMessage, kvStatus],
+    ["Minimum Motor KV Flight Floor", `${kv} KV`, minKvMessage, minKvStatus], // Inserted check here
     ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, propulsionMessage, propulsionStatus],
     ["Thrust-to-Weight Ratio", `${fmt(twr, 1)} : 1`, getTwrMessage(twr, minTargetTwr, propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit, performanceDesc), propulsionStatus],
     ["Max Safe Weight", `${fmt(maxRecommendedWeight, 0)} g`, [`The maximum possible weight for the minimum required thrust-to-weight ratio is ${maxWeight.toFixed(1)} g.`,
@@ -762,7 +845,7 @@ function check(){
       <div class="status ${getCssClass(status)}">${detail} — ${status.toUpperCase()}</div>
     </div>`).join("");
 
-  const hasWarnings = checks.some(c => c[3] === 'warning');
+  const hasWarnings = checks.some(c => c[3] === 'warning' || c[3] === 'irregular');
   const hasErrors = checks.some(c => c[3] === 'bad');
   
   $("overall").textContent = hasErrors ? "SETUP NEEDS ATTENTION" : hasWarnings ? "SETUP HAS WARNINGS" : "SETUP APPEARS OK";
@@ -772,3 +855,4 @@ function check(){
 }
 
 $("check").addEventListener("click", check);
+
