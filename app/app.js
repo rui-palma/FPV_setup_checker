@@ -549,9 +549,7 @@ function check(){
   const diameterRatio = propIn / testPropIn; 
   const slipExponent = 1.3;
   const rpmSlipFactor = Math.pow(1 / diameterRatio, slipExponent);
-
-  const peakLoadedRPM = peakLoadedRPMFromTest * voltageRatio * rpmSlipFactor;
-  const actualRpmRatio = peakLoadedRPM / peakLoadedRPMFromTest;
+  const actualRpmRatio = voltageRatio * rpmSlipFactor;
 
   const peakThrustPerMotor = peakThrustPerMotorFromTest * Math.pow(actualRpmRatio, 2) * Math.pow(diameterRatio, 4);
   const peakAmpsPerMotor = peakAmpsPerMotorFromTest * Math.pow(actualRpmRatio, 3) * Math.pow(diameterRatio, 5);
