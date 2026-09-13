@@ -181,6 +181,12 @@ label span {
     color: #b91c1c;
 }
 
+.warnbg {
+  background-color: #fff3cd; 
+  color: #856404;            
+  border: 1px solid #ffeeba; 
+}
+
 
 /* ========================================
    Overall result
