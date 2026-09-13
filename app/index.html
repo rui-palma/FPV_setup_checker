@@ -196,6 +196,7 @@
         <li><strong>Target operational RPM</strong> = Interpolated RPM value from test data corresponding to the required thrust per motor.</li>
         <li><strong>Target RPM limit check</strong> = Verifies that target operational RPM does not exceed the theoretical no-load maximum (KV × Max Battery Voltage).</li>
         <li><strong>Motor max KV</strong> = Verifies that the selected battery cell count does not exceed the motor's maximum supported cell count (motorMaxS) and ensures the configured motor KV safely respects structural RPM bounds.</li>
+        <li><strong>Minimum motor KV</strong> = Interpolates acceptable KV ranges based on the selected propeller diameter and battery cell count using predefined empirical data tables. It flags setups that fall below the practical minimum (resulting in sluggish response) or absolute minimum (unable to fly).</li>
         <li><strong>Total system peak current</strong> = Scaled peak 100% throttle current (adjusted by RPM ratio cubed and propeller diameter ratio to the 5th power) × number of motors.</li>
         <li><strong>Minimum C-rating</strong> = Total system peak current ÷ (battery capacity in mAh ÷ 1000).</li>
         <li><strong>ESC burst rating</strong> = Evaluates transient zero-airspeed spikes. Calculates excess heat rate as ((Peak Amps ÷ ESC Burst)&sup2; - 1) × 100, warning if >0% and critical if >15%.</li>

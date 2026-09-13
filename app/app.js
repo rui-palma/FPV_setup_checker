@@ -211,7 +211,22 @@ function loadConfigData(config, successMessage = "Setup loaded successfully!") {
     if (config.capacitorConfig.voltageRipple) $("capVoltageRipple").value = config.capacitorConfig.voltageRipple;
     if (config.capacitorConfig.currentRipple) $("capCurrentRipple").value = config.capacitorConfig.currentRipple;
   }
-
+  
+  // Clear previous results and approximation warnings
+  const resultsSection = $("results");
+  if (resultsSection) {
+    resultsSection.classList.add("hidden");
+    $("resultList").innerHTML = "";
+    $("overall").textContent = "";
+    $("overall").className = "overall";
+  }
+  
+  const approximationsSection = $("approximationsSection");
+  if (approximationsSection) {
+    approximationsSection.classList.add("hidden");
+    $("approximationsContent").innerHTML = "";
+  }
+  
   alert(successMessage);
 }
 
@@ -640,10 +655,10 @@ function check(){
   } else {
     if (kv < absMinKv) {
       minKvStatus = 'bad';
-      minKvMessage = `KV is below the absolute minimum flight floor (~${Math.round(absMinKv)} KV). The drone will likely not be able to fly.`;
+      minKvMessage = `KV is below the absolute minimum flight floor (~${Math.round(absMinKv)} KV).`;
     } else if (kv < pracMinKv) {
       minKvStatus = 'warning';
-      minKvMessage = `KV is below the practical minimum (~${Math.round(pracMinKv)} KV). Expect sluggish response, prop wash, and poor stability.`;
+      minKvMessage = `KV is below the practical minimum (~${Math.round(pracMinKv)} KV). <br> While it is still above the absolute minimum (~${Math.round(absMinKv)} KV), this is a problematic setup`;
     } else {
       minKvStatus = 'ok';
       minKvMessage = `KV is safely above the practical minimum for a ${propIn}" prop on ${batteryS}S (~${Math.round(pracMinKv)} KV).`;
