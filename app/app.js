@@ -5,7 +5,28 @@ function fmt(x, digits=1){ return Number.isFinite(x) ? x.toLocaleString(undefine
 
 // --- Preset Setups ---
 const presetSetups = {
-  "10inch": {
+  "5inch 4S": {
+    "drone": { "weight": 2000, "motors": 4, "minTargetTwr": 2, "propulsionUtilizationLimit": 85 },
+    "propeller": { "propDiameter": 5 },
+    "motor": { "kv": 2400, "motorMinS": 3, "motorMaxS": 4, "testBatteryS": 4, "testPropDiameter": 5 },
+    "battery": { "batteryS": 4, "capacity": 5000, "crate": 50 },
+    "esc": { "esc": 60, "escBurst": 70, "escMinS": 4, "escMaxS": 6, "escUtilizationLimit": 80 },
+    "testRows": [
+      { "mandatory": true, "throttle": 100, "thrust": 1300, "current": 35.8, "voltage": 16.8, "rpm": null },
+      { "mandatory": false, "throttle": 90, "thrust": 1100, "current": 28.1, "voltage": 16.8, "rpm": 25520 },
+      { "mandatory": false, "throttle": 80, "thrust": 930, "current": 21.5, "voltage": 16.8, "rpm": 23560 },
+      { "mandatory": false, "throttle": 70, "thrust": 760, "current": 15.8, "voltage": 16.8, "rpm": 21320 },
+      { "mandatory": false, "throttle": 60, "thrust": 600, "current": 11.1, "voltage": 16.8, "rpm": 18970 },
+      { "mandatory": false, "throttle": 50, "thrust": 440, "current": 7.3, "voltage": 16.8, "rpm": 16390 },
+      { "mandatory": false, "throttle": 40, "thrust": 300, "current": 4.47, "voltage": 16.8, "rpm": 13720 },
+      { "mandatory": false, "throttle": 30, "thrust": 180, "current": 2.31, "voltage": 16.8, "rpm": 10710 }
+    ],
+    "capacitorRows": [
+      { "mandatory": true, "voltage": 35, "uF": 1000 }
+    ],
+    "capacitorConfig": { "switchingFreq": 24, "voltageRipple": 10, "currentRipple": 22 }
+  },
+  "10inch 6S": {
     "drone": { "weight": 4000, "motors": 4, "minTargetTwr": 2, "propulsionUtilizationLimit": 85 },
     "propeller": { "propDiameter": 10 },
     "motor": { "kv": 900, "motorMinS": 3, "motorMaxS": 6, "testBatteryS": 6, "testPropDiameter": 10 },
@@ -22,7 +43,7 @@ const presetSetups = {
     "capacitorRows": [{ "mandatory": true, "voltage": 35, "uF": 1500 }],
     "capacitorConfig": { "switchingFreq": 24, "voltageRipple": 10, "currentRipple": 22 }
   },
-  "13inch": {
+  "13inch 6S": {
     "drone": { "weight": 4000, "motors": 4, "minTargetTwr": 2, "propulsionUtilizationLimit": 85 },
     "propeller": { "propDiameter": 13 },
     "motor": { "kv": 660, "motorMinS": 3, "motorMaxS": 8, "testBatteryS": 6, "testPropDiameter": 13 },
@@ -351,13 +372,14 @@ $("exportBtn").addEventListener("click", () => {
   };
 
   document.querySelectorAll('.test-row').forEach(row => {
+    const rpmStr = row.querySelector('.row-rpm').value;
     config.testRows.push({
       mandatory: row.dataset.mandatory === "true",
       throttle: Number(row.querySelector('.row-throttle').value) || 0,
       thrust: Number(row.querySelector('.row-thrust').value) || 0,
       current: Number(row.querySelector('.row-current').value) || 0,
       voltage: Number(row.querySelector('.row-voltage').value) || 0,
-      rpm: Number(row.querySelector('.row-rpm').value) || 0
+      rpm: rpmStr === "" ? null : Number(rpmStr)
     });
   });
   
@@ -479,13 +501,16 @@ function check(){
     return;
   }
   
-  const rawRows = Array.from(document.querySelectorAll('.test-row')).map(row => ({
-    throttle: Number(row.querySelector('.row-throttle').value) || 0,
-    thrust: Number(row.querySelector('.row-thrust').value) || 0,
-    current: Number(row.querySelector('.row-current').value) || 0,
-    voltage: Number(row.querySelector('.row-voltage').value) || 0,
-    rpm: Number(row.querySelector('.row-rpm').value) || 0
-  }));
+  const rawRows = Array.from(document.querySelectorAll('.test-row')).map(row => {
+    const rpmStr = row.querySelector('.row-rpm').value;
+    return {
+      throttle: Number(row.querySelector('.row-throttle').value) || 0,
+      thrust: Number(row.querySelector('.row-thrust').value) || 0,
+      current: Number(row.querySelector('.row-current').value) || 0,
+      voltage: Number(row.querySelector('.row-voltage').value) || 0,
+      rpm: rpmStr === "" ? null : Number(rpmStr) // Stores null if blank, or the number if typed
+    };
+  });
 
   if (rawRows.some(r => r.throttle > 100)) {
     alert("Throttle levels cannot exceed 100%.");
@@ -493,6 +518,19 @@ function check(){
   }
   
   rawRows.sort((a, b) => a.throttle - b.throttle);
+  
+  // Handle Missing 100% RPM
+  const peakRowIdx = rawRows.length - 1;
+  if (rawRows[peakRowIdx].rpm === null && rawRows.length > 1) {
+    for (let i = peakRowIdx - 1; i >= 0; i--) {
+      if (rawRows[i].rpm !== null && rawRows[i].thrust > 0 && rawRows[peakRowIdx].thrust > 0) {
+        rawRows[peakRowIdx].rpm = rawRows[i].rpm * Math.sqrt(rawRows[peakRowIdx].thrust / rawRows[i].thrust);
+        break; 
+      }
+    }
+  }
+  
+  const hasAnyRpm = rawRows.some(r => r.rpm !== null); // Check if any RPM data exists at all
   
   for (let i = 0; i < rawRows.length - 1; i++) {
     const currentData = rawRows[i];
@@ -645,12 +683,15 @@ function check(){
   let rpmStatus = 'ok';
   let rpmMessage = `The required operational RPM is within physical constraints`;
   
-  if (targetRpm > maxNoLoadRpm) {
+  if (!hasAnyRpm) {
+      rpmStatus = 'irregular';
+      rpmMessage = `No information on RPM was provided in the test data.`;
+  } else if (targetRpm > maxNoLoadRpm) {
       rpmStatus = 'bad';
       rpmMessage = `The required operational RPM is above the theoretical no-load maximum (${fmt(maxNoLoadRpm, 0)} RPM)`;
   } else if (targetRpm > maxNoLoadRpm * 0.9) {
       rpmStatus = 'bad';
-      rpmMessage = `The required operational RPM is above 90% of the theoretical no-load maximum (${fmt(maxNoLoadRpm, 0)} RPM).This is practically impossible, and not empircally observed.`;
+      rpmMessage = `The required operational RPM is above 90% of the theoretical no-load maximum (${fmt(maxNoLoadRpm, 0)} RPM). This is practically impossible, and not empircally observed.`;
   } else if (targetRpm > maxNoLoadRpm * 0.8) {
     rpmStatus = 'warning';
     rpmMessage = `The required operational RPM is above 80% of the theoretical no-load maximum (${fmt(maxNoLoadRpm, 0)} RPM). This is extremely unusual.`;
@@ -796,7 +837,7 @@ function check(){
                                                             `The max safe weight is ${fmt(maxRecommendedWeight, 0)} g, which is ${Math.round(yellowPropulsionLimit * 100)}% of the total max weight.`,
                                                             `The drone's weight is ${fmt(weight, 0)} g`,
                                                             getWeightMessage(propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit)].join('<br>'), propulsionStatus],
-    ["Target Operational RPM Check", `${fmt(targetRpm,0)} RPM`, rpmMessage, rpmStatus],
+    ["Target Operational RPM Check", hasAnyRpm ? `${fmt(targetRpm,0)} RPM` : "N/A", rpmMessage, rpmStatus],
     ["Peak current/motor", `${fmt(peakAmpsPerMotor,1)} A`, `${fmt(peakPowerPerMotor,0)} W peak at ${fmt(peakVoltagePerMotor,1)}V`, 'ok'],
     ["Total peak system current", `${fmt(totalPeakAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
     ["ESC burst capability", `${fmt(peakAmpsPerMotor,1)} / ${fmt(escBurst,0)} A`, 
