@@ -23,8 +23,7 @@ const presetSetups = {
     ],
     "capacitorRows": [
       { "mandatory": true, "voltage": 35, "uF": 1000 }
-    ],
-    "capacitorConfig": { "switchingFreq": 24, "voltageRipple": 10, "currentRipple": 22 }
+    ]
   },
   "10inch 6S": {
     "drone": { "weight": 4000, "motors": 4, "minTargetTwr": 2, "propulsionUtilizationLimit": 85 },
@@ -40,8 +39,7 @@ const presetSetups = {
       { "mandatory": false, "throttle": 50, "thrust": 1781, "current": 18.25, "voltage": 25.25, "rpm": 9547 },
       { "mandatory": false, "throttle": 20, "thrust": 128, "current": 0.74, "voltage": 25.32, "rpm": 2984 }
     ],
-    "capacitorRows": [{ "mandatory": true, "voltage": 35, "uF": 1500 }],
-    "capacitorConfig": { "switchingFreq": 24, "voltageRipple": 10, "currentRipple": 22 }
+    "capacitorRows": [{ "mandatory": true, "voltage": 35, "uF": 1500 }]
   },
   "13inch 6S": {
     "drone": { "weight": 4000, "motors": 4, "minTargetTwr": 2, "propulsionUtilizationLimit": 85 },
@@ -57,8 +55,7 @@ const presetSetups = {
       { "mandatory": false, "throttle": 60, "thrust": 2512, "current": 21.09, "voltage": 21.95, "rpm": 7343 },
       { "mandatory": false, "throttle": 50, "thrust": 1750, "current": 12.86, "voltage": 22.09, "rpm": 6199 }
     ],
-    "capacitorRows": [{ "mandatory": true, "voltage": 35, "uF": 2200 }],
-    "capacitorConfig": { "switchingFreq": 24, "voltageRipple": 10, "currentRipple": 22 }
+    "capacitorRows": [{ "mandatory": true, "voltage": 35, "uF": 2200 }]
   }
 };
 
@@ -107,7 +104,54 @@ const practicalMinKvTable = {
   20: { 6: 190, 8: 145, 12: 100 }
 };
 
-function getMinKv(table, prop, cells) {
+// --- Min Capacitance Data ---
+const absoluteMinCapacitanceTable = {
+  2: { 1: 0, 2: 0, 3: 100, 4: 100 },
+  3: { 2: 100, 3: 100, 4: 150, 6: 220 },
+  4: { 3: 150, 4: 220, 6: 220 },
+  5: { 3: 220, 4: 220, 6: 330 },
+  6: { 2: 150, 3: 220, 4: 330, 6: 330, 8: 470 },
+  7: { 2: 150, 3: 220, 4: 330, 6: 470, 8: 680 },
+  8: { 2: 220, 3: 330, 4: 470, 6: 470, 8: 680 },
+  9: { 2: 220, 3: 330, 4: 470, 6: 680, 8: 680, 12: 1000 },
+  10: { 2: 330, 3: 470, 4: 470, 6: 680, 8: 1000, 12: 1320 },
+  11: { 3: 470, 4: 470, 6: 680, 8: 1000, 12: 1320 },
+  12: { 3: 680, 4: 680, 6: 1000, 8: 1000, 12: 1320 },
+  13: { 3: 680, 4: 680, 6: 1000, 8: 1000, 12: 1320, 14: 1880 },
+  14: { 3: 1000, 4: 1000, 6: 1000, 8: 1320, 12: 1880, 14: 1880 },
+  15: { 4: 1000, 6: 1320, 8: 1320, 12: 1880, 14: 1880 },
+  16: { 6: 1320, 8: 1320, 12: 1880, 14: 1880 },
+  17: { 6: 1320, 8: 1880, 12: 1880, 14: 2000 },
+  18: { 6: 1320, 8: 1880, 12: 2000, 14: 2720 },
+  19: { 6: 1880, 8: 1880, 12: 2000, 14: 2720 },
+  20: { 6: 1880, 8: 1880, 12: 2720, 14: 2720 }
+};
+
+const reasonableMinCapacitanceTable = {
+  2: { 1: 100, 2: 220, 3: 220, 4: 330 },
+  3: { 2: 220, 3: 330, 4: 470, 6: 470 },
+  4: { 3: 330, 4: 470, 6: 680 },
+  5: { 3: 470, 4: 1000, 6: 1000 },
+  6: { 2: 330, 3: 470, 4: 680, 6: 1000, 8: 1500 },
+  7: { 2: 330, 3: 470, 4: 680, 6: 1000, 8: 1500 },
+  8: { 2: 470, 3: 680, 4: 1000, 6: 1000, 8: 1500 },
+  9: { 2: 470, 3: 680, 4: 1000, 6: 1000, 8: 1500, 12: 2720 },
+  10: { 2: 680, 3: 1000, 4: 1000, 6: 1500, 8: 2720, 12: 4000 },
+  11: { 3: 1000, 4: 1000, 6: 1500, 8: 2720, 12: 4000 },
+  12: { 3: 1500, 4: 1500, 6: 2000, 8: 2720, 12: 4000 },
+  13: { 3: 1500, 4: 1500, 6: 2000, 8: 2720, 12: 4000, 14: 4700 },
+  14: { 3: 2000, 4: 2000, 6: 2000, 8: 2720, 12: 4000, 14: 4700 },
+  15: { 4: 2000, 6: 2720, 8: 4000, 12: 4700, 14: 4700 },
+  16: { 6: 2720, 8: 4000, 12: 4700, 14: 6800 },
+  17: { 6: 2720, 8: 4000, 12: 6800, 14: 6800 },
+  18: { 6: 4000, 8: 4700, 12: 6800, 14: 8000 },
+  19: { 6: 4000, 8: 4700, 12: 8000, 14: 8000 },
+  20: { 6: 4000, 8: 4700, 12: 8000, 14: 10000 }
+};
+
+// Generic table lookup and interpolation
+function getMinTableValue(table, propRaw, cells) {
+  const prop = Math.round(propRaw);
   if (!table[prop]) return null;
   const availableCells = Object.keys(table[prop]).map(Number).sort((a, b) => a - b);
   if (cells < availableCells[0] || cells > availableCells[availableCells.length - 1]) return null;
@@ -117,9 +161,9 @@ function getMinKv(table, prop, cells) {
     if (i < availableCells.length - 1 && cells > availableCells[i] && cells < availableCells[i + 1]) {
       const c1 = availableCells[i];
       const c2 = availableCells[i + 1];
-      const kv1 = table[prop][c1];
-      const kv2 = table[prop][c2];
-      return kv1 + ((kv2 - kv1) * (cells - c1)) / (c2 - c1);
+      const val1 = table[prop][c1];
+      const val2 = table[prop][c2];
+      return val1 + ((val2 - val1) * (cells - c1)) / (c2 - c1);
     }
   }
   return null;
@@ -227,12 +271,6 @@ function loadConfigData(config, successMessage = "Setup loaded successfully!") {
     });
   }
   
-  if (config.capacitorConfig) {
-    if (config.capacitorConfig.switchingFreq) $("capSwitchingFreq").value = config.capacitorConfig.switchingFreq;
-    if (config.capacitorConfig.voltageRipple) $("capVoltageRipple").value = config.capacitorConfig.voltageRipple;
-    if (config.capacitorConfig.currentRipple) $("capCurrentRipple").value = config.capacitorConfig.currentRipple;
-  }
-  
   // Clear previous results and approximation warnings
   const resultsSection = $("results");
   if (resultsSection) {
@@ -306,10 +344,6 @@ $("addCapRowBtn").addEventListener("click", () => {
   $("capacitorRows").appendChild(row);
 });
 
-$("toggleCapAssumptionsBtn").addEventListener("click", () => {
-  $("capAssumptions").classList.toggle("hidden");
-});
-
 // Generic function to linearly interpolate/extrapolate any property based on target thrust
 function getInterpolatedValue(targetThrust, dataPoints, property) {
   if (targetThrust <= 0) return 0;
@@ -363,12 +397,7 @@ $("exportBtn").addEventListener("click", () => {
       escUtilizationLimit: n("escUtilizationLimit")
     },
     testRows: [],
-    capacitorRows: [],
-    capacitorConfig: {
-      switchingFreq: n("capSwitchingFreq"),
-      voltageRipple: n("capVoltageRipple"),
-      currentRipple: n("capCurrentRipple")
-    }
+    capacitorRows: []
   };
 
   document.querySelectorAll('.test-row').forEach(row => {
@@ -639,8 +668,9 @@ function check(){
   }
   
   // --- Min Motor KV Check ---
-  const absMinKv = getMinKv(absoluteMinKvTable, propIn, batteryS);
-  const pracMinKv = getMinKv(practicalMinKvTable, propIn, batteryS);
+  const roundedProp = Math.round(propIn);
+  const absMinKv = getMinTableValue(absoluteMinKvTable, roundedProp, batteryS);
+  const pracMinKv = getMinTableValue(practicalMinKvTable, roundedProp, batteryS);
 
   let minKvStatus = 'ok';
   let minKvMessage = '';
@@ -772,24 +802,24 @@ function check(){
     capVoltageDetail = `More than 30% voltage margin compared to the full battery (${fmt(maxBatVoltage, 1)} V)`;
   }
 
-  const f_sw = n("capSwitchingFreq") * 1000;
-  const delta_T = 1 / f_sw; 
-  const currentRipple = (n("capCurrentRipple") / 100) * totalPeakAmps;
-  const voltageRipple = (n("capVoltageRipple") / 100) * maxBatVoltage;
-  const minCapFarads = (currentRipple * delta_T) / voltageRipple;
-  const minCapUF = minCapFarads * 1000000;
+  const absMinCap = getMinTableValue(absoluteMinCapacitanceTable, roundedProp, batteryS);
+  const reasonableMinCap = getMinTableValue(reasonableMinCapacitanceTable, roundedProp, batteryS);
 
   let capAmountStatus = 'ok';
   let capAmountDetail = '';
-  if (totalCapacitance < (minCapUF)) {
+
+  if (absMinCap === null || reasonableMinCap === null) {
+    capAmountStatus = 'irregular';
+    capAmountDetail = `The combination of a ${propIn}" prop on ${batteryS}S is highly irregular and falls completely outside of standard physics bounds for determining required capacitance`
+  } else if (totalCapacitance < absMinCap) {
     capAmountStatus = 'bad';
-    capAmountDetail = `Total capacitance is critically low (minimum: ${fmt(minCapUF, 0)} µF)`;
-  } else if (totalCapacitance < (1.5 * minCapUF)) {
+    capAmountDetail = `Total capacitance is critically low (absolute minimum: ${fmt(absMinCap, 0)} µF)`;
+  } else if (totalCapacitance < reasonableMinCap) {
     capAmountStatus = 'warning';
-    capAmountDetail = `Total capacitance is marginal (recommended > ${fmt(1.5 * minCapUF, 0)} µF) <br> Dangerously low if below ${fmt(minCapUF, 0)} µF `;
+    capAmountDetail = `Total capacitance is marginal (recommended &ge; ${fmt(reasonableMinCap, 0)} µF) <br> Dangerously low if below ${fmt(absMinCap, 0)} µF`;
   } else {
     capAmountStatus = 'ok';
-    capAmountDetail = `Total capacitance is sufficient <br> Recommended to be above ${fmt(1.5 * minCapUF, 0)} µF <br> Dangerously low if below ${fmt(0.5 * minCapUF, 0)} µF`;
+    capAmountDetail = `Total capacitance is sufficient <br> Recommended to be &ge; ${fmt(reasonableMinCap, 0)} µF <br> Dangerously low if below ${fmt(absMinCap, 0)} µF`;
   }
   
   const maxWeight = totalPeakThrust / minTargetTwr;
@@ -805,6 +835,9 @@ function check(){
   }
   if (minKvStatus === 'irregular') {
     approximations.push(`The combination of a ${propIn}" prop on ${batteryS}S is highly irregular and falls completely outside of standard physics bounds for minimum KV expectations.`);
+  }
+  if (absMinCap === null) {
+    approximations.push(`The combination of a ${roundedProp}" prop on ${batteryS}S falls outside standard capacitor sizing tables.`);
   }
 
   const approxContent = $("approximationsContent");
@@ -830,7 +863,7 @@ function check(){
     ["Battery/Motor Voltage Match", `${batteryS}S`, `Motor accepts ${motorMinS}S to ${motorMaxS}S`, isVoltageForMotorsOk ? 'ok' : 'bad'],
     ["Battery/ESC Voltage Match", `${batteryS}S`, `ESC accepts ${escMinS}S to ${escMaxS}S`, isEscVoltageOk ? 'ok' : 'bad'],
     ["Motor KV Aerodynamic Limit", `${kv} KV`, kvMessage, kvStatus],
-    ["Minimum Motor KV Flight Floor", `${kv} KV`, minKvMessage, minKvStatus], // Inserted check here
+    ["Minimum Motor KV Flight Floor", `${kv} KV`, minKvMessage, minKvStatus],
     ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, propulsionMessage, propulsionStatus],
     ["Thrust-to-Weight Ratio", `${fmt(twr, 1)} : 1`, getTwrMessage(twr, minTargetTwr, propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit, performanceDesc), propulsionStatus],
     ["Max Safe Weight", `${fmt(maxRecommendedWeight, 0)} g`, [`The maximum possible weight for the minimum required thrust-to-weight ratio is ${maxWeight.toFixed(1)} g.`,
@@ -869,4 +902,3 @@ function check(){
 }
 
 $("check").addEventListener("click", check);
-

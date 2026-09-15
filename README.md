@@ -41,16 +41,6 @@ This is a fully client-side web application built with vanilla web technologies.
 2. **Open the app:**
    Double-click `index.html` to open it directly in your web browser, or serve it via a local development server.
 
-## 📜 Formulas Used
-
-* **Estimated total static thrust** = Scaled peak 100% throttle thrust (adjusted by RPM ratio squared and propeller diameter ratio to the 4th power) × number of motors.
-* **Max safe weight** = (Estimated total static thrust ÷ minimum target TWR) × propulsion utilization limit.
-* **Target operational RPM** = Interpolated RPM value from test data corresponding to the required thrust per motor.
-* **Total system peak current** = Scaled peak 100% throttle current (adjusted by RPM ratio cubed and propeller diameter ratio to the 5th power) × number of motors.
-* **Minimum C-rating** = Total system peak current ÷ (battery capacity in mAh ÷ 1000).
-* **ESC excess heat rate** = ((Peak Amps ÷ ESC Burst)² - 1) × 100.
-* **Minimum required capacitance** = (I_ripple × ΔT) ÷ ΔV. 
-
 ## 🤝 Contributing
 
 Contributions, feature ideas, and hardware calibration tweaks are always welcome! Feel free to open an issue or submit a pull request.

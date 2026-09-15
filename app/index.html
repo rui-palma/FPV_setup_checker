@@ -136,29 +136,6 @@
     <div style="margin-top: 14px;">
       <button id="addCapRowBtn" type="button" class="secondary">➕ Add Capacitor</button>
     </div>
-    <div style="margin-top: 14px; text-align: right;">
-      <button id="toggleCapAssumptionsBtn" type="button" class="secondary" style="font-size: 0.85em;">⚙️ Display Assumptions</button>
-    </div>
-    <div id="capAssumptions" class="hidden" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border, #374151);">
-      <div class="grid">
-        <label>Switching frequency <span>kHz</span>
-          <div class="input-with-button">
-            <input id="capSwitchingFreq" type="number" value="24" readonly>
-          </div>
-        </label>
-        <label>Allowed voltage ripple <span>%</span>
-          <div class="input-with-button">
-            <input id="capVoltageRipple" type="number" value="10" readonly>
-          </div>
-        </label>
-        <label>Assumed current ripple <span>%</span>
-          <div class="input-with-button">
-            <input id="capCurrentRipple" type="number" value="22" readonly>
-          </div>
-        </label>
-      </div>
-      <p class="hint" style="margin-top: 14px; margin-bottom: 0;">Capacitors are assumed to be low-ESR.</p>
-    </div>
   </section>
 
   <div style="display: flex; gap: 10px; margin-bottom: 14px; align-items: center; flex-wrap: wrap;">
@@ -205,7 +182,7 @@
         <li><strong>ESC continuous capability</strong> = Interpolates the continuous current required to maintain target TWR, capped at the peak motor current limit.</li>
         <li><strong>ESC continuous utilization</strong> = Required continuous current ÷ ESC continuous rating.</li>
         <li><strong>Capacitor voltage margin</strong> = Checks that capacitor rated voltage exceeds maximum battery voltage (Cell count × 4.2V) with at least a 35% safety margin.</li>
-        <li><strong>Minimum required capacitance</strong> = C_min = (I_ripple × ΔT) ÷ ΔV. Switching period ΔT = 1 ÷ 24000 Hz, current ripple I_ripple = 0.22 × Total Peak Amps, and allowed voltage ripple ΔV = 0.10 × Max Battery Voltage. Recommended setup provides &ge; 1.5 × C_min.</li>
+        <li><strong>Minimum required capacitance</strong> = Evaluated against empirical tables defining the absolute physical limits (to prevent hardware failure from regenerative braking) and reasonable practical limits (to ensure clean video and ESC longevity) based on propeller size and battery voltage.</li>
       </ul>
     </details>
   </footer>
