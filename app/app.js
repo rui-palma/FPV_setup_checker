@@ -894,7 +894,7 @@ function check(){
                                                             `The drone's weight is ${fmt(weight, 0)} g`,
                                                             getWeightUtilizationMessage(propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit)].join('<br>'), propulsionStatus],
     ["Max Safe Weight", `${fmt(trueMaxSafeWeight, 0)} g`,
-                                                           [`The max safe weight is the maximum possible weight permitting at most ${Math.round(yellowPropulsionLimit * 100)}% propulsion utilization, and whose battery C rating allows a current 15% above that of the 2:1 Thurst-to-Weight ratio.`,
+                                                           [`The max safe weight is the maximum possible weight permitting at most ${Math.round(yellowPropulsionLimit * 100)}% propulsion utilization, and whose battery C rating allows a current 15% above that of the 2:1 Thrust-to-Weight ratio.`,
                                                             `The drone's weight is ${fmt(weight, 0)} g.`,
                                                             safeWeightDesc
                                                            ].join('<br>'), maxSafeWeightStatus],
