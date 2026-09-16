@@ -642,18 +642,8 @@ function check(){
   });
   testData.sort((a, b) => a.thrust - b.thrust);
   
-  const twr = totalPeakThrust / weight;
-  const requiredThrustPerMotor = weight * minTargetTwr / motors;
-  
-  const yellowPropulsionLimit = propulsionUtilizationLimit;
-  const redPropulsionLimit = 0.9;
-  const yellowContinuousAmps = esc * escUtilizationLimit;
-  const redContinuousAmps = esc * 0.90;
-  const yellowExcessHeatRate = 0; 
-  const redExcessHeatRate = 15; 
-  const nominalVoltage = batteryS * 3.7;
-
   // --- Max Motor KV Check ---
+  const nominalVoltage = batteryS * 3.7;
   const maxSafeRpm = 720000 / (propIn * Math.PI); 
   const maxSafeKv = Math.floor(maxSafeRpm / nominalVoltage);
 
@@ -690,9 +680,10 @@ function check(){
       minKvMessage = `KV is safely above the practical minimum for a ${propIn}" prop on ${batteryS}S (~${Math.round(pracMinKv)} KV).`;
     }
   }
-
-  const maxBatVoltage = batteryS * 4.2;
   
+  const requiredThrustPerMotor = weight * minTargetTwr / motors;
+  const yellowPropulsionLimit = propulsionUtilizationLimit;
+  const redPropulsionLimit = 0.9;
   const propulsionUtilization = peakThrustPerMotor > 0 ? requiredThrustPerMotor / peakThrustPerMotor : 1.0;
   let propulsionStatus = 'ok';
   const yellowPct = Math.round(yellowPropulsionLimit * 100);
@@ -727,6 +718,8 @@ function check(){
     rpmMessage = `The required operational RPM is above 80% of the theoretical no-load maximum (${fmt(maxNoLoadRpm, 0)} RPM). This is extremely unusual.`;
   }
   
+  const yellowContinuousAmps = esc * escUtilizationLimit;
+  const redContinuousAmps = esc * 0.90;
   const requiredAmpsPerMotor = getInterpolatedValue(requiredThrustPerMotor, testData, 'current');
   const requiredContinuousAmpsPerMotor = Math.min(requiredAmpsPerMotor, peakAmpsPerMotor);
   let continuousAmpsStatus = 'ok';
@@ -736,38 +729,43 @@ function check(){
       continuousAmpsStatus = 'warning';
   }
   const escUtilizationPct = (requiredContinuousAmpsPerMotor / esc) * 100;
-
+  
+  const twr = totalPeakThrust / weight;
   let performanceDesc = "Optimal";
   if (twr > 6.0) performanceDesc = "Very agile";
   else if (twr > 4.0) performanceDesc = "Agile";
   else if (twr > 2 / propulsionUtilizationLimit) performanceDesc = "Reasonable";
   else if (twr >= 2) performanceDesc = "Heavy, becoming underpowered";
   else performanceDesc = "Underpowered (Too Heavy)";
-
-  const minC = totalPeakAmps / (capacity / 1000);
+  
   const burstOverload = peakAmpsPerMotor / escBurst;
   const excessHeatRate = burstOverload > 1 ? (Math.pow(burstOverload, 2) - 1) * 100 : 0;
+  const yellowExcessHeatRate = 0; 
+  const redExcessHeatRate = 15; 
   let excessHeatRateStatus = 'ok';
   if (excessHeatRate >= redExcessHeatRate) {
       excessHeatRateStatus = 'bad';
   } else if (excessHeatRate > yellowExcessHeatRate) {
       excessHeatRateStatus = 'warning';
   }
-  
-  const yellowCrateLimit = 0.10; // 10% margin
-  const redCrateLimit = 0.20;    // 20% margin
-  const cRatio = minC / crate;
+
+  const thrustFor2to1PerMotor = (weight * 2) / motors;
+  const ampsFor2to1PerMotor = getInterpolatedValue(thrustFor2to1PerMotor, testData, 'current');
+  const totalAmpsFor2to1 = ampsFor2to1PerMotor * motors;
+  const minC = totalAmpsFor2to1 / (capacity / 1000); 
+  const maxBatteryAmps = crate * (capacity / 1000);
+
   let cStatus = 'ok';
   let cDetail = "";
-  
-  if (cRatio > (1 + redCrateLimit)) {
-    cStatus = 'bad';
-    cDetail = `Requires ${fmt(minC, 1)} C (exceeds ${crate} C rating by more than ${redCrateLimit * 100}%)`;
-  } else if (cRatio > 1 || cRatio > (1 - yellowCrateLimit)) {
-    cStatus = 'warning';
-    cDetail = `Requires ${fmt(minC, 1)} C (rating is close to or exceeds limit; lacks recommended ${yellowCrateLimit * 100}% margin)`;
+  if (maxBatteryAmps < totalAmpsFor2to1) {
+    cStatus = 'bad'; // Red
+    cDetail = `2:1 TWR requires ${fmt(totalAmpsFor2to1, 1)} A. Battery only provides ${fmt(maxBatteryAmps, 1)} A (Needs ${fmt(minC, 1)} C).`;
+  } else if (maxBatteryAmps >= totalAmpsFor2to1 * 1.20) {
+    cStatus = 'ok';  // Green
+    cDetail = `Battery provides ${fmt(maxBatteryAmps, 1)} A, safely exceeding the 2:1 TWR requirement of ${fmt(totalAmpsFor2to1, 1)} A by >20% (Needs ${fmt(minC, 1)} C).`;
   } else {
-    cDetail = `Requires ${fmt(minC, 1)} C (healthy safety margin)`;
+    cStatus = 'warning'; // Yellow
+    cDetail = `Battery provides ${fmt(maxBatteryAmps, 1)} A. Meets 2:1 TWR requirement (${fmt(totalAmpsFor2to1, 1)} A) but lacks a 20% margin.`;
   }
   
   // --- Capacitor Analysis ---
@@ -788,7 +786,7 @@ function check(){
   }
 
   const totalCapacitance = capRows.reduce((sum, cap) => sum + cap.uF, 0);
-
+  const maxBatVoltage = batteryS * 4.2;
   let capVoltageStatus = 'ok';
   let capVoltageDetail = '';
   if (capVoltage < maxBatVoltage) {
