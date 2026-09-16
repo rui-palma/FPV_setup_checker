@@ -169,7 +169,8 @@
       <ul>
         <li><strong>Estimated total static thrust</strong> = Scaled peak 100% throttle thrust from test data (adjusted by RPM ratio squared and propeller diameter ratio to the 4th power) × number of motors.</li>
         <li><strong>Thrust-to-weight ratio (TWR)</strong> = Estimated total static thrust ÷ actual drone weight.</li>
-        <li><strong>Max safe weight</strong> = (Estimated total static thrust ÷ minimum target TWR) × propulsion utilization limit.</li>
+        <li><strong>Weight vs Max Propulsion Utilization</strong> = Evaluates drone weight against the absolute maximum weight determined by the minimum target TWR and propulsion utilization limit.</li>
+        <li><strong>Max safe weight</strong> = Maximum possible weight permitting at most the propulsion utilization limit, and whose battery C rating allows a current 15% above that of the 2:1 TWR.</li>
         <li><strong>Max loaded RPM</strong> = Highest RPM value from motor test data, adjusted by the voltage ratio and propeller slip factor.</li>
         <li><strong>Target operational RPM</strong> = Interpolated RPM value from test data corresponding to the required thrust per motor.</li>
         <li><strong>Target RPM limit check</strong> = Verifies that target operational RPM does not exceed the theoretical no-load maximum (KV × Max Battery Voltage).</li>

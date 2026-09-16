@@ -344,24 +344,27 @@ $("addCapRowBtn").addEventListener("click", () => {
   $("capacitorRows").appendChild(row);
 });
 
-// Generic function to linearly interpolate/extrapolate any property based on target thrust
-function getInterpolatedValue(targetThrust, dataPoints, property) {
-  if (targetThrust <= 0) return 0;
+// Generic function to linearly interpolate/extrapolate any property
+function getInterpolatedValue(targetX, dataPoints, propX, propY) {
+  if (targetX <= 0) return 0;
   if (dataPoints.length < 2) return 0;
 
   for (let i = 0; i < dataPoints.length - 1; i++) {
     const p1 = dataPoints[i];
     const p2 = dataPoints[i + 1];
-    if (targetThrust >= p1.thrust && targetThrust <= p2.thrust) {
-      const fraction = (targetThrust - p1.thrust) / (p2.thrust - p1.thrust);
-      return p1[property] + fraction * (p2[property] - p1[property]);
+    
+    // Check if target falls between these two points
+    if (targetX >= p1[propX] && targetX <= p2[propX]) {
+      const fraction = (targetX - p1[propX]) / (p2[propX] - p1[propX]);
+      return p1[propY] + fraction * (p2[propY] - p1[propY]);
     }
   }
   
+  // Extrapolate if above max
   const p1 = dataPoints[dataPoints.length - 2];
   const p2 = dataPoints[dataPoints.length - 1];
-  const fraction = (targetThrust - p1.thrust) / (p2.thrust - p1.thrust);
-  return p1[property] + fraction * (p2[property] - p1[property]);
+  const fraction = (targetX - p1[propX]) / (p2[propX] - p1[propX]);
+  return p1[propY] + fraction * (p2[propY] - p1[propY]);
 }
 
 
@@ -475,17 +478,17 @@ function getTwrMessage(twr, minTargetTwr, utilization, yellowLimit, redLimit, pe
   return `Thrust-to-weight ratio is comfortably above the required minimum <br> Agility: ${performanceDesc}`;
 }
 
-function getWeightMessage(utilization, yellowLimit, redLimit) {
+function getWeightUtilizationMessage(utilization, yellowLimit, redLimit) {
   const yellowPct = Math.round(yellowLimit * 100);
   const redPct = Math.round(redLimit * 100);
 
   if (utilization >= redLimit) {
-    return `The drone's weight is too close to the absolute maximum (above ${redPct}%)`;
+    return `The drone's weight is too close to the absolute maximum for the required TWR (above ${redPct}% utilization)`;
   }
   if (utilization >= yellowLimit) {
-    return `The drone's weight is close to the absolute maximum (above ${yellowLimit}%)`;
+    return `The drone's weight is close to the absolute maximum for the required TWR (above ${yellowPct}% utilization)`;
   }
-  return `The drone's weight is comfortably below the absolute maximum`;
+  return `The drone's weight is comfortably below the utilization limit`;
 }
 
 
@@ -698,7 +701,7 @@ function check(){
       propulsionMessage = `The required thrust is between ${yellowPct}% to ${redPct}% of the peak thrust!`;
   }
 
-  const targetRpm = getInterpolatedValue(requiredThrustPerMotor, testData, 'rpm');
+  const targetRpm = getInterpolatedValue(requiredThrustPerMotor, testData, 'thrust', 'rpm');
   const maxNoLoadRpm = kv * (batteryS * 4.2); 
   
   let rpmStatus = 'ok';
@@ -720,7 +723,7 @@ function check(){
   
   const yellowContinuousAmps = esc * escUtilizationLimit;
   const redContinuousAmps = esc * 0.90;
-  const requiredAmpsPerMotor = getInterpolatedValue(requiredThrustPerMotor, testData, 'current');
+  const requiredAmpsPerMotor = getInterpolatedValue(requiredThrustPerMotor, testData, 'thrust', 'current');
   const requiredContinuousAmpsPerMotor = Math.min(requiredAmpsPerMotor, peakAmpsPerMotor);
   let continuousAmpsStatus = 'ok';
   if (requiredContinuousAmpsPerMotor >= redContinuousAmps) {
@@ -749,23 +752,24 @@ function check(){
       excessHeatRateStatus = 'warning';
   }
 
-  const thrustFor2to1PerMotor = (weight * 2) / motors;
-  const ampsFor2to1PerMotor = getInterpolatedValue(thrustFor2to1PerMotor, testData, 'current');
-  const totalAmpsFor2to1 = ampsFor2to1PerMotor * motors;
+  const totalAmpsFor2to1 = requiredAmpsPerMotor * motors;
   const minC = totalAmpsFor2to1 / (capacity / 1000); 
   const maxBatteryAmps = crate * (capacity / 1000);
+  const minCapacity = (totalAmpsFor2to1 / crate) * 1000; 
+
+  const reqText = `<br>Required to meet demand: <br>- Either a ${fmt(minC, 1)}C rating<br>- Or a ${fmt(minCapacity, 0)}mAh capacity for the current C-rating`;
 
   let cStatus = 'ok';
   let cDetail = "";
   if (maxBatteryAmps < totalAmpsFor2to1) {
     cStatus = 'bad'; // Red
-    cDetail = `2:1 TWR requires ${fmt(totalAmpsFor2to1, 1)} A. Battery only provides ${fmt(maxBatteryAmps, 1)} A (Needs ${fmt(minC, 1)} C).`;
-  } else if (maxBatteryAmps >= totalAmpsFor2to1 * 1.20) {
+    cDetail = `2:1 TWR requires ${fmt(totalAmpsFor2to1, 1)} A. Battery only provides ${fmt(maxBatteryAmps, 1)} A.${reqText}`;
+  } else if (maxBatteryAmps >= totalAmpsFor2to1 * 1.15) {
     cStatus = 'ok';  // Green
-    cDetail = `Battery provides ${fmt(maxBatteryAmps, 1)} A, safely exceeding the 2:1 TWR requirement of ${fmt(totalAmpsFor2to1, 1)} A by >20% (Needs ${fmt(minC, 1)} C).`;
+    cDetail = `Battery provides ${fmt(maxBatteryAmps, 1)} A, safely exceeding the 2:1 TWR requirement of ${fmt(totalAmpsFor2to1, 1)} A by >15%.${reqText}`;
   } else {
     cStatus = 'warning'; // Yellow
-    cDetail = `Battery provides ${fmt(maxBatteryAmps, 1)} A. Meets 2:1 TWR requirement (${fmt(totalAmpsFor2to1, 1)} A) but lacks a 20% margin.`;
+    cDetail = `Battery provides ${fmt(maxBatteryAmps, 1)} A. Meets 2:1 TWR requirement (${fmt(totalAmpsFor2to1, 1)} A) but lacks a 15% margin.${reqText}`;
   }
   
   // --- Capacitor Analysis ---
@@ -820,8 +824,29 @@ function check(){
     capAmountDetail = `Total capacitance is sufficient <br> Recommended to be &ge; ${fmt(reasonableMinCap, 0)} µF <br> Dangerously low if below ${fmt(absMinCap, 0)} µF`;
   }
   
+  // --- Max Safe Weight Calculation ---
   const maxWeight = totalPeakThrust / minTargetTwr;
-  const maxRecommendedWeight = maxWeight * yellowPropulsionLimit;
+  const maxWeightForMaxPropulsionUtilization = maxWeight * yellowPropulsionLimit;
+  
+  const maxCurrentPerMotorFor15PercentMargin = (maxBatteryAmps / 1.15) / motors;
+  const maxThrustForBatteryMargin = getInterpolatedValue(maxCurrentPerMotorFor15PercentMargin, testData, 'current', 'thrust');
+  const maxWeightForBattery = (maxThrustForBatteryMargin * motors) / 2; // Derived from 2:1 TWR requirement
+  
+  const trueMaxSafeWeight = Math.min(maxWeightForMaxPropulsionUtilization, maxWeightForBattery);
+  
+  let maxSafeWeightStatus = 'ok';
+  let safeWeightDesc = "The drone weight sits comfortably within these constraints.";
+  
+  if (weight <= trueMaxSafeWeight) {
+      maxSafeWeightStatus = 'ok';
+  } else if (propulsionUtilization < redPropulsionLimit && maxBatteryAmps > totalAmpsFor2to1) {
+      // Prop utilization < 90% AND current for C rating above TWR
+      maxSafeWeightStatus = 'warning';
+      safeWeightDesc = "The drone weight exceeds optimal constraints but remains within marginal safety limits.";
+  } else {
+      maxSafeWeightStatus = 'bad';
+      safeWeightDesc = "The drone weight exceeds the maximum safe constraints!";
+  }
   
   // --- Approximation Analysis Section ---
   const approximations = [];
@@ -864,10 +889,16 @@ function check(){
     ["Minimum Motor KV Flight Floor", `${kv} KV`, minKvMessage, minKvStatus],
     ["Propulsion Utilization", `${fmt(propulsionUtilization * 100, 1)}%`, propulsionMessage, propulsionStatus],
     ["Thrust-to-Weight Ratio", `${fmt(twr, 1)} : 1`, getTwrMessage(twr, minTargetTwr, propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit, performanceDesc), propulsionStatus],
-    ["Max Safe Weight", `${fmt(maxRecommendedWeight, 0)} g`, [`The maximum possible weight for the minimum required thrust-to-weight ratio is ${maxWeight.toFixed(1)} g.`,
-                                                            `The max safe weight is ${fmt(maxRecommendedWeight, 0)} g, which is ${Math.round(yellowPropulsionLimit * 100)}% of the total max weight.`,
+    ["Weight vs Max Propulsion Utilization", `${fmt(maxWeightForMaxPropulsionUtilization, 0)} g`, [`The maximum possible weight for the minimum required thrust-to-weight ratio is ${maxWeight.toFixed(1)} g.`,
+                                                            `The weight limit for ${Math.round(yellowPropulsionLimit * 100)}% utilization is ${fmt(maxWeightForMaxPropulsionUtilization, 0)} g.`,
                                                             `The drone's weight is ${fmt(weight, 0)} g`,
-                                                            getWeightMessage(propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit)].join('<br>'), propulsionStatus],
+                                                            getWeightUtilizationMessage(propulsionUtilization, yellowPropulsionLimit, redPropulsionLimit)].join('<br>'), propulsionStatus],
+    ["Max Safe Weight", `${fmt(trueMaxSafeWeight, 0)} g`,
+                                                           [`The max safe weight is the maximum possible weight permitting at most ${Math.round(yellowPropulsionLimit * 100)}% propulsion utilization, and whose battery C rating allows a current 15% above that of the 2:1 Thurst-to-Weight ratio.`,
+                                                            `The drone's weight is ${fmt(weight, 0)} g.`,
+                                                            safeWeightDesc
+                                                           ].join('<br>'), maxSafeWeightStatus],
+    ["Battery C-rating check", `${fmt(minC,1)} / ${crate} C`, cDetail, cStatus],
     ["Target Operational RPM Check", hasAnyRpm ? `${fmt(targetRpm,0)} RPM` : "N/A", rpmMessage, rpmStatus],
     ["Peak current/motor", `${fmt(peakAmpsPerMotor,1)} A`, `${fmt(peakPowerPerMotor,0)} W peak at ${fmt(peakVoltagePerMotor,1)}V`, 'ok'],
     ["Total peak system current", `${fmt(totalPeakAmps,1)} A`, `${fmt(peakAmpsPerMotor,1)} A × ${motors}`, 'ok'],
@@ -878,7 +909,6 @@ function check(){
                                             [`Requires ${fmt(requiredContinuousAmpsPerMotor, 1)} A for maintaining the target thrust-to-weight ratio of ${minTargetTwr.toFixed(1)} : 1`,
                                              `This is ${fmt(escUtilizationPct, 1)}% of the ESC continuous rating of ${fmt(esc,0)} A`,
                                              `(Warning > ${fmt((yellowContinuousAmps/ esc) * 100, 1)}%) (Critical > ${fmt((redContinuousAmps/ esc) * 100, 1)}%)`].join('<br>'), continuousAmpsStatus],
-    ["Battery C-rating check", `${fmt(minC,1)} / ${crate} C`, cDetail, cStatus],
     ["Capacitor Voltage Margin", `${capVoltage} V`, capVoltageDetail, capVoltageStatus],
     ["Capacitance Rating", `${totalCapacitance} µF`, capAmountDetail, capAmountStatus]
   ];
